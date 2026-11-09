@@ -1,5 +1,9 @@
 import { redirect } from "next/navigation";
 
+// Next.js 16 dengan Cache Components tidak mengizinkan `dynamic = "force-dynamic"`.
+// `instant = false` membuat rute ini boleh memblokir dan dirender saat request.
+export const instant = false;
+
 interface Props {
   searchParams: Promise<Record<string, string | string[] | undefined>>;
 }
