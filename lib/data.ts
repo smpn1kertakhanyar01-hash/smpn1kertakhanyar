@@ -1,4 +1,4 @@
-import type { AgendaAkademik, AkunSiswa } from "./types";
+import type { AgendaAkademik, AkunSandiSiswa, AkunSiswa } from "./types";
 
 export interface CatatanAbsenSeed {
   nisn: string;
@@ -7,95 +7,121 @@ export interface CatatanAbsenSeed {
 }
 
 export const DATA_SISWA_KELAS: Record<string, CatatanAbsenSeed[]> = {
-  "IX A": [
-    { nisn: "0119741828", nama: "AFIKA DEWI", kelas: "IX A" },
-    { nisn: "0123691710", nama: "AHMAD ALFARIZ", kelas: "IX A" },
-    { nisn: "0124909669", nama: "Aisyah Putri", kelas: "IX A" },
-    { nisn: "0122506321", nama: "AISYAH WIRDHA", kelas: "IX A" },
-    { nisn: "3110548598", nama: "Alya", kelas: "IX A" },
-    { nisn: "0127657034", nama: "Citra Lutfia Nur", kelas: "IX A" },
-    { nisn: "3117999184", nama: "Desi", kelas: "IX A" },
-    { nisn: "3126782140", nama: "Dinda HD Nata", kelas: "IX A" },
-    { nisn: "0112944152", nama: "ELLIYA DIHA KARISA", kelas: "IX A" },
-    { nisn: "0126478938", nama: "FIRA FADTAH WATI", kelas: "IX A" },
-    { nisn: "0118231215", nama: "Khairun Nisa", kelas: "IX A" },
-    { nisn: "0118474092", nama: "Listi Amellia", kelas: "IX A" },
-    { nisn: "0111150257", nama: "LOVY MUGFIRAH", kelas: "IX A" },
-    { nisn: "3118076325", nama: "MUHAMMAD HAFIZH FIRDAUS", kelas: "IX A" },
-    { nisn: "3112443445", nama: "M. Rayhan", kelas: "IX A" },
-    { nisn: "3119172064", nama: "Marifatullah", kelas: "IX A" },
-    { nisn: "0126727890", nama: "Muhammad Budiansyah", kelas: "IX A" },
-    { nisn: "0112557891", nama: "Muhammad Firdaus", kelas: "IX A" },
-    { nisn: "0129852441", nama: "MUHAMMAD NUR MAULANA", kelas: "IX A" },
-    { nisn: "3128237260", nama: "Muhammad Rafasya Elvin", kelas: "IX A" },
-    { nisn: "0112949364", nama: "Muhammad Zaini", kelas: "IX A" },
-    { nisn: "0129598702", nama: "Nadya Lailil Ghina", kelas: "IX A" },
-    { nisn: "3127596070", nama: "Najwa", kelas: "IX A" },
-    { nisn: "3115658647", nama: "Noor Azkia Rusyida", kelas: "IX A" },
-    { nisn: "0111010386", nama: "NUR BIDAIYATI HIDAYAH", kelas: "IX A" },
-    { nisn: "0111730618", nama: "RAHMAT ISMAIL ADITYA YUSUF", kelas: "IX A" },
-    { nisn: "3118272341", nama: "Ridwan", kelas: "IX A" },
-    { nisn: "0115093819", nama: "Said Kesya Pahlevie", kelas: "IX A" },
-    { nisn: "3100009934", nama: "SAPARI PUTRA", kelas: "IX A" },
-    { nisn: "0119643352", nama: "SURYA PUTRA", kelas: "IX A" },
-    { nisn: "0103338260", nama: "VENCENT ADITTIYA DEVKANT", kelas: "IX A" },
-    { nisn: "0119042311", nama: "Yasmin Maulida Habibah", kelas: "IX A" },
+  "9A": [
+    { nisn: "0119741828", nama: "AFIKA DEWI", kelas: "9A" },
+    { nisn: "0123691710", nama: "AHMAD ALFARIZ", kelas: "9A" },
+    { nisn: "0124909669", nama: "Aisyah Putri", kelas: "9A" },
+    { nisn: "0122506321", nama: "AISYAH WIRDHA", kelas: "9A" },
+    { nisn: "3110548598", nama: "Alya", kelas: "9A" },
+    { nisn: "0127657034", nama: "Citra Lutfia Nur", kelas: "9A" },
+    { nisn: "3117999184", nama: "Desi", kelas: "9A" },
+    { nisn: "3126782140", nama: "Dinda HD Nata", kelas: "9A" },
+    { nisn: "0112944152", nama: "ELLIYA DIHA KARISA", kelas: "9A" },
+    { nisn: "0126478938", nama: "FIRA FADTAH WATI", kelas: "9A" },
+    { nisn: "0118231215", nama: "Khairun Nisa", kelas: "9A" },
+    { nisn: "0118474092", nama: "Listi Amellia", kelas: "9A" },
+    { nisn: "0111150257", nama: "LOVY MUGFIRAH", kelas: "9A" },
+    { nisn: "3118076325", nama: "MUHAMMAD HAFIZH FIRDAUS", kelas: "9A" },
+    { nisn: "3112443445", nama: "M. Rayhan", kelas: "9A" },
+    { nisn: "3119172064", nama: "Marifatullah", kelas: "9A" },
+    { nisn: "0126727890", nama: "Muhammad Budiansyah", kelas: "9A" },
+    { nisn: "0112557891", nama: "Muhammad Firdaus", kelas: "9A" },
+    { nisn: "0129852441", nama: "MUHAMMAD NUR MAULANA", kelas: "9A" },
+    { nisn: "3128237260", nama: "Muhammad Rafasya Elvin", kelas: "9A" },
+    { nisn: "0112949364", nama: "Muhammad Zaini", kelas: "9A" },
+    { nisn: "0129598702", nama: "Nadya Lailil Ghina", kelas: "9A" },
+    { nisn: "3127596070", nama: "Najwa", kelas: "9A" },
+    { nisn: "3115658647", nama: "Noor Azkia Rusyida", kelas: "9A" },
+    { nisn: "0111010386", nama: "NUR BIDAIYATI HIDAYAH", kelas: "9A" },
+    { nisn: "0111730618", nama: "RAHMAT ISMAIL ADITYA YUSUF", kelas: "9A" },
+    { nisn: "3118272341", nama: "Ridwan", kelas: "9A" },
+    { nisn: "0115093819", nama: "Said Kesya Pahlevie", kelas: "9A" },
+    { nisn: "3100009934", nama: "SAPARI PUTRA", kelas: "9A" },
+    { nisn: "0119643352", nama: "SURYA PUTRA", kelas: "9A" },
+    { nisn: "0103338260", nama: "VENCENT ADITTIYA DEVKANT", kelas: "9A" },
+    { nisn: "0119042311", nama: "Yasmin Maulida Habibah", kelas: "9A" },
   ],
-  "IX B": [
-    { nisn: "3129764636", nama: "Agil Saputra", kelas: "IX B" },
-    { nisn: "0105007862", nama: "Ahda Aulia", kelas: "IX B" },
-    { nisn: "0112441457", nama: "AHMAD NAUFAL", kelas: "IX B" },
-    { nisn: "0111411342", nama: "AISYAH ARRAMADHAN", kelas: "IX B" },
-    { nisn: "0127659251", nama: "AVIKA INDAH SALSABILLA", kelas: "IX B" },
-    { nisn: "0129319000", nama: "Azkia Ramadhani", kelas: "IX B" },
-    { nisn: "3127885082", nama: "Azkiya Najwa", kelas: "IX B" },
-    { nisn: "0112173852", nama: "Elya", kelas: "IX B" },
-    { nisn: "0111533299", nama: "Hidayatullah", kelas: "IX B" },
-    { nisn: "0126571006", nama: "HISYAM NIZAR", kelas: "IX B" },
-    { nisn: "0117399498", nama: "M. RAYHAN AR RASYID", kelas: "IX B" },
-    { nisn: "0125619274", nama: "MAYDA AZZAHRA", kelas: "IX B" },
-    { nisn: "0111608509", nama: "Muhammad Ad'dani Putra", kelas: "IX B" },
-    { nisn: "0128830880", nama: "MUHAMMAD DANIAL RAFA ARUMI", kelas: "IX B" },
-    { nisn: "0116849305", nama: "Muhammad Daniel Saputra", kelas: "IX B" },
-    { nisn: "3124262910", nama: "MUHAMMAD HAFI BADALI", kelas: "IX B" },
-    { nisn: "0095284227", nama: "MUHAMMAD JUHDIANOR", kelas: "IX B" },
-    { nisn: "3127692376", nama: "MUHAMMAD MALIUNI RAMADHANI", kelas: "IX B" },
-    { nisn: "0102703290", nama: "MUHAMMAD NABIL FUAD", kelas: "IX B" },
-    { nisn: "3101857417", nama: "Muhammad Rahman", kelas: "IX B" },
-    { nisn: "0118112220", nama: "Nasma Ramadhani", kelas: "IX B" },
-    { nisn: "3114951992", nama: "Nia Artiya", kelas: "IX B" },
-    { nisn: "3124785359", nama: "NIA RAMADHANI", kelas: "IX B" },
-    { nisn: "0121890658", nama: "NOOR KHAFIFAH", kelas: "IX B" },
-    { nisn: "0112426156", nama: "Nur Dina Nazwa", kelas: "IX B" },
-    { nisn: "0109377413", nama: "Putri Larasati", kelas: "IX B" },
-    { nisn: "3111847105", nama: "Rizky Mubarak", kelas: "IX B" },
-    { nisn: "0111255564", nama: "Said Pasya Pahlevie", kelas: "IX B" },
-    { nisn: "3115975014", nama: "Tania Anggraini", kelas: "IX B" },
-    { nisn: "0118095973", nama: "ZAHRA KHAFIFAH", kelas: "IX B" },
-    { nisn: "0125406858", nama: "Zahratussyifa", kelas: "IX B" },
+  "9B": [
+    { nisn: "3129764636", nama: "Agil Saputra", kelas: "9B" },
+    { nisn: "0105007862", nama: "Ahda Aulia", kelas: "9B" },
+    { nisn: "0112441457", nama: "AHMAD NAUFAL", kelas: "9B" },
+    { nisn: "0111411342", nama: "AISYAH ARRAMADHAN", kelas: "9B" },
+    { nisn: "0127659251", nama: "AVIKA INDAH SALSABILLA", kelas: "9B" },
+    { nisn: "0129319000", nama: "Azkia Ramadhani", kelas: "9B" },
+    { nisn: "3127885082", nama: "Azkiya Najwa", kelas: "9B" },
+    { nisn: "0112173852", nama: "Elya", kelas: "9B" },
+    { nisn: "0111533299", nama: "Hidayatullah", kelas: "9B" },
+    { nisn: "0126571006", nama: "HISYAM NIZAR", kelas: "9B" },
+    { nisn: "0117399498", nama: "M. RAYHAN AR RASYID", kelas: "9B" },
+    { nisn: "0125619274", nama: "MAYDA AZZAHRA", kelas: "9B" },
+    { nisn: "0111608509", nama: "Muhammad Ad'dani Putra", kelas: "9B" },
+    { nisn: "0128830880", nama: "MUHAMMAD DANIAL RAFA ARUMI", kelas: "9B" },
+    { nisn: "0116849305", nama: "Muhammad Daniel Saputra", kelas: "9B" },
+    { nisn: "3124262910", nama: "MUHAMMAD HAFI BADALI", kelas: "9B" },
+    { nisn: "0095284227", nama: "MUHAMMAD JUHDIANOR", kelas: "9B" },
+    { nisn: "3127692376", nama: "MUHAMMAD MALIUNI RAMADHANI", kelas: "9B" },
+    { nisn: "0102703290", nama: "MUHAMMAD NABIL FUAD", kelas: "9B" },
+    { nisn: "3101857417", nama: "Muhammad Rahman", kelas: "9B" },
+    { nisn: "0118112220", nama: "Nasma Ramadhani", kelas: "9B" },
+    { nisn: "3114951992", nama: "Nia Artiya", kelas: "9B" },
+    { nisn: "3124785359", nama: "NIA RAMADHANI", kelas: "9B" },
+    { nisn: "0121890658", nama: "NOOR KHAFIFAH", kelas: "9B" },
+    { nisn: "0112426156", nama: "Nur Dina Nazwa", kelas: "9B" },
+    { nisn: "0109377413", nama: "Putri Larasati", kelas: "9B" },
+    { nisn: "3111847105", nama: "Rizky Mubarak", kelas: "9B" },
+    { nisn: "0111255564", nama: "Said Pasya Pahlevie", kelas: "9B" },
+    { nisn: "3115975014", nama: "Tania Anggraini", kelas: "9B" },
+    { nisn: "0118095973", nama: "ZAHRA KHAFIFAH", kelas: "9B" },
+    { nisn: "0125406858", nama: "Zahratussyifa", kelas: "9B" },
   ],
 };
 
 /**
- * Kata sandi siswa mengikuti pola "smp" + 4 digit terakhir NISN,
- * sehingga setiap siswa memiliki sandi yang berbeda dan unik.
+ * Kata sandi siswa mengikuti pola "smp" + 4 digit terakhir NISN.
+ * Beberapa akun memiliki sandi khusus yang tercatat pada data sekolah.
  */
+const SANDI_KHUSUS_SISWA: Record<string, string> = {
+  // Sesuai data asli sekolah: Ahda Aulia memakai sandi khusus.
+  "0105007862": "ahda7862",
+};
+
+export function sandiSiswaDariNisn(nisn: string): string {
+  const bersih = nisn.trim();
+  return SANDI_KHUSUS_SISWA[bersih] ?? `smp${bersih.slice(-4)}`;
+}
+
 export const AKUN_SISWA_SEED: AkunSiswa[] = Object.values(DATA_SISWA_KELAS)
   .flat()
   .map((siswa) => ({
     ...siswa,
-    sandi: `smp${siswa.nisn.slice(-4)}`,
+    sandi: sandiSiswaDariNisn(siswa.nisn),
   }));
+
+/**
+ * Daftar akun siswa untuk tampilan darurat (mis. saat SQLite Vercel tidak
+ * dapat dibaca). Isinya sama dengan 63 siswa asli pada AKUN_SISWA_SEED.
+ */
+export function daftarAkunSandiSiswaFallback(): AkunSandiSiswa[] {
+  return AKUN_SISWA_SEED.map((akun, indeks) => ({
+    id: -(indeks + 1),
+    nisn: akun.nisn,
+    nama: akun.nama,
+    kelas: akun.kelas,
+    tanggalGantiSandi: null,
+    sandiTerkini: akun.sandi,
+    sumberSandi: null,
+  }));
+}
 
 /** Akun demo umum yang selalu dapat digunakan untuk mencoba aplikasi. */
 export const AKUN_DEMO_SISWA: AkunSiswa = {
   nisn: "siswa",
   nama: "Siswa Demo",
-  kelas: "IX A",
+  kelas: "9A",
   sandi: "siswa123",
 };
 
-/** Akun siswa demo lama yang digantikan oleh data siswa IX A dan IX B. */
+/** Akun siswa demo lama yang digantikan oleh data siswa kelas 9A dan 9B. */
 export const USERNAME_SISWA_LAMA = [
   "0081234561",
   "0081234562",

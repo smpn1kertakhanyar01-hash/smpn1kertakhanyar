@@ -16,6 +16,7 @@ import {
   AGENDA_AKADEMIK,
   AKUN_DEMO_SISWA,
   AKUN_SISWA_SEED,
+  sandiSiswaDariNisn,
   USERNAME_SISWA_LAMA,
 } from "./data";
 import {
@@ -372,7 +373,7 @@ const KUNCI_BACKUP_SANDI = crypto
 export function sandiDefaultSiswa(identifier: string): string {
   const bersih = identifier.trim();
   return /^\d{10}$/.test(bersih)
-    ? `smp${bersih.slice(-4)}`
+    ? sandiSiswaDariNisn(bersih)
     : AKUN_DEMO_SISWA.sandi;
 }
 
@@ -411,7 +412,7 @@ function dekripsiSandiBackup(tercatat: string): string | null {
   }
 }
 
-const VERSI_SINKRON_AKUN_SISWA = 2;
+const VERSI_SINKRON_AKUN_SISWA = 3;
 
 function pastikanAkunGuru(db: Database.Database): void {
   const cekAkun = db.prepare(
@@ -1124,6 +1125,9 @@ export function resetSandiSiswa(
 }
 
 export function getStudentAccountsWithPassword(): AkunSandiSiswa[] {
+  const petaSandiSeed = new Map(
+    AKUN_SISWA_SEED.map((akun) => [akun.nisn, akun.sandi])
+  );
   const rows = getDb()
     .prepare(
       `SELECT
@@ -1143,9 +1147,11 @@ export function getStudentAccountsWithPassword(): AkunSandiSiswa[] {
          LIMIT 1
        )
        WHERE u.role = 'siswa'
+         AND u.username <> ?
+         AND COALESCE(u.nisn, '') <> ?
        ORDER BY u.kelas ASC, u.nama ASC`
     )
-    .all() as AkunSandiRow[];
+    .all(AKUN_DEMO_SISWA.nisn, AKUN_DEMO_SISWA.nisn) as AkunSandiRow[];
 
   return rows.map((row) => ({
     id: row.id,
@@ -1155,7 +1161,7 @@ export function getStudentAccountsWithPassword(): AkunSandiSiswa[] {
     tanggalGantiSandi: row.tanggalGantiSandi,
     sandiTerkini: row.sandiTercatat
       ? dekripsiSandiBackup(row.sandiTercatat)
-      : null,
+      : petaSandiSeed.get(row.nisn) ?? null,
     sumberSandi: row.sumberSandi,
   }));
 }

@@ -60,12 +60,18 @@ Data localStorage lama (presensi, surat izin, jurnal, mutasi) dimigrasikan otoma
 
 | Peran | NISN / User | Kata Sandi |
 | --- | --- | --- |
-| Guru | `guru`, `admin`, atau `piket` | `@Smpn1KH#` |
-| Admin TU | `petugas.smpn1kh` atau `admintu` | `adminTUkece` |
+| Petugas (satu pintu) | `guru`, `admintu`, atau `petugas.smpn1kh` | `@Smpn1KH#` atau `adminTUkece` |
 | Siswa (demo umum) | `siswa` | `siswa123` |
 
-Siswa kelas IX A dan IX B masuk menggunakan NISN masing-masing dengan kata sandi
-`"smp" + 4 digit terakhir NISN` (contoh: NISN `0119741828` → sandi `smp1828`).
+Seluruh akun petugas di atas otomatis memiliki akses penuh **Admin TU** ke menu
+Kesiswaan (Verifikasi Surat Izin, Presensi Harian, Jurnal Siswa, Backup Sandi
+Siswa) dan Administrasi TU (Mutasi Siswa, Administrasi Ijazah).
+
+Sebanyak 63 siswa kelas 9A dan 9B masuk menggunakan NISN masing-masing dengan
+kata sandi `"smp" + 4 digit terakhir NISN` (contoh: NISN `0119741828` → sandi
+`smp1828`). Pengecualian: NISN `0105007862` (Ahda Aulia) memakai sandi
+`ahda7862`. Daftar lengkap sandi dapat dilihat pada menu **Backup Sandi Siswa**
+di dashboard petugas.
 
 Siswa baru dapat mendaftar melalui halaman **Aktivasi Akun Siswa** (`/register-siswa`).
 

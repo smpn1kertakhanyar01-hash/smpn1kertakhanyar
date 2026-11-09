@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { sesiDariPermintaan } from "@/lib/api-auth";
 import { getStudentAccountsWithPassword } from "@/lib/db";
+import { daftarAkunSandiSiswaFallback } from "@/lib/data";
 
 export async function GET(request: Request) {
   try {
@@ -13,10 +14,10 @@ export async function GET(request: Request) {
 
     return NextResponse.json(getStudentAccountsWithPassword());
   } catch (error) {
-    console.error("Gagal membaca data akun siswa:", error);
-    return NextResponse.json(
-      { error: "Gagal membaca data akun siswa." },
-      { status: 500 }
+    console.error(
+      "Gagal membaca data akun siswa, memakai data fallback:",
+      error
     );
+    return NextResponse.json(daftarAkunSandiSiswaFallback());
   }
 }

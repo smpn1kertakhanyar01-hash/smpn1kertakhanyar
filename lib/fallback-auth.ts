@@ -1,6 +1,82 @@
 import crypto from "node:crypto";
 import { PERAN_PEGAWAI } from "./constants";
+import { AKUN_DEMO_SISWA, AKUN_SISWA_SEED } from "./data";
 import type { Pengguna, SesiPengguna } from "./types";
+
+/** Username petugas yang selalu dapat login lewat portal pegawai. */
+export const USERNAME_PETUGAS_FALLBACK = [
+  "guru",
+  "admintu",
+  "petugas.smpn1kh",
+] as const;
+
+/** Kata sandi petugas yang diterima untuk seluruh username di atas. */
+export const PASSWORD_PETUGAS_FALLBACK = [
+  "@Smpn1KH#",
+  "adminTUkece",
+] as const;
+
+export function cariAkunPetugasFallback(
+  identifier: string,
+  password: string
+): Pengguna | null {
+  const username = identifier.trim().toLowerCase();
+  const usernameCocok = (USERNAME_PETUGAS_FALLBACK as readonly string[]).includes(
+    username
+  );
+
+  if (
+    !usernameCocok ||
+    !(PASSWORD_PETUGAS_FALLBACK as readonly string[]).includes(password)
+  ) {
+    return null;
+  }
+
+  return {
+    id: -1,
+    username,
+    role: "guru",
+    staffRole: "ADMIN_TU",
+    nama: "Petugas Tata Usaha & Kesiswaan",
+  };
+}
+
+export function cariAkunSiswaFallback(
+  identifier: string,
+  password: string
+): Pengguna | null {
+  const nisn = identifier.trim();
+
+  if (
+    nisn.toLowerCase() === AKUN_DEMO_SISWA.nisn.toLowerCase() &&
+    password === AKUN_DEMO_SISWA.sandi
+  ) {
+    return {
+      id: -999,
+      username: AKUN_DEMO_SISWA.nisn,
+      role: "siswa",
+      nama: AKUN_DEMO_SISWA.nama,
+      nisn: AKUN_DEMO_SISWA.nisn,
+      kelas: AKUN_DEMO_SISWA.kelas,
+    };
+  }
+
+  const indeks = AKUN_SISWA_SEED.findIndex((akun) => akun.nisn === nisn);
+  if (indeks === -1) return null;
+
+  const akun = AKUN_SISWA_SEED[indeks];
+  const sandiFormula = `smp${akun.nisn.slice(-4)}`;
+  if (password !== akun.sandi && password !== sandiFormula) return null;
+
+  return {
+    id: -(indeks + 10),
+    username: akun.nisn,
+    role: "siswa",
+    nama: akun.nama,
+    nisn: akun.nisn,
+    kelas: akun.kelas,
+  };
+}
 
 /**
  * Sesi stateless untuk akun darurat (fallback).
