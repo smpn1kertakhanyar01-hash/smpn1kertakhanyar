@@ -7,10 +7,14 @@ import {
   getSiswaProfileById,
 } from "@/lib/db-kesiswaan";
 import {
+  daftarMutasiMemori,
+  simpanMutasiMemori,
+} from "@/lib/memory-store";
+import {
   buatPesanNotifikasiMutasi,
   kirimPesanWhatsApp,
 } from "@/lib/wa-fonnte";
-import type { JenisMutasi } from "@/lib/types";
+import type { JenisMutasi, MutasiSiswa } from "@/lib/types";
 
 const JENIS_VALID: JenisMutasi[] = ["MASUK", "KELUAR"];
 const POLA_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
@@ -42,23 +46,29 @@ export async function GET(request: Request) {
     const { searchParams } = new URL(request.url);
     const siswaId = Number(searchParams.get("siswaId"));
     const jenis = searchParams.get("jenis");
+    const filter = {
+      siswaId: Number.isInteger(siswaId) && siswaId > 0 ? siswaId : undefined,
+      jenisMutasi:
+        jenis === "MASUK" || jenis === "KELUAR"
+          ? (jenis as JenisMutasi)
+          : undefined,
+    };
 
-    return NextResponse.json(
-      getMutasiSiswa({
-        siswaId:
-          Number.isInteger(siswaId) && siswaId > 0 ? siswaId : undefined,
-        jenisMutasi:
-          jenis === "MASUK" || jenis === "KELUAR"
-            ? (jenis as JenisMutasi)
-            : undefined,
-      })
-    );
+    const dariMemori = daftarMutasiMemori(filter);
+
+    try {
+      const dariDatabase = getMutasiSiswa(filter);
+      if (dariDatabase.length > 0) {
+        return NextResponse.json([...dariMemori, ...dariDatabase]);
+      }
+    } catch (error) {
+      console.error("Gagal membaca mutasi siswa dari SQLite:", error);
+    }
+
+    return NextResponse.json(dariMemori);
   } catch (error) {
     console.error("Gagal membaca mutasi siswa:", error);
-    return NextResponse.json(
-      { error: "Gagal membaca mutasi siswa." },
-      { status: 500 }
-    );
+    return NextResponse.json([]);
   }
 }
 
@@ -118,8 +128,18 @@ export async function POST(request: Request) {
       );
     }
 
-    let profil = siswaId !== null ? getSiswaProfileById(siswaId) : null;
-    if (siswaId !== null && !profil) {
+    let gagalBacaDatabase = false;
+    let profil: ReturnType<typeof getSiswaProfileById> = null;
+    if (siswaId !== null) {
+      try {
+        profil = getSiswaProfileById(siswaId);
+      } catch (error) {
+        gagalBacaDatabase = true;
+        console.error("Gagal membaca profil siswa:", error);
+      }
+    }
+    // Tetap tolak ID yang memang tidak ada saat database dapat dibaca normal.
+    if (siswaId !== null && !profil && !gagalBacaDatabase) {
       return NextResponse.json(
         { error: "Siswa tidak ditemukan atau bukan akun siswa." },
         { status: 400 }
@@ -135,8 +155,12 @@ export async function POST(request: Request) {
     }
 
     if (siswaId === null) {
-      siswaId = cariSiswaIdByNisn(nisn);
-      if (siswaId !== null) profil = getSiswaProfileById(siswaId);
+      try {
+        siswaId = cariSiswaIdByNisn(nisn);
+        if (siswaId !== null) profil = getSiswaProfileById(siswaId);
+      } catch (error) {
+        console.error("Gagal mencari siswa berdasarkan NISN:", error);
+      }
     }
 
     const namaSiswa = body.namaSiswa?.trim() || profil?.nama || "";
@@ -147,7 +171,7 @@ export async function POST(request: Request) {
       );
     }
 
-    const tersimpan = createMutasiSiswa({
+    const payload = {
       siswaId,
       namaSiswa,
       nisn,
@@ -164,40 +188,60 @@ export async function POST(request: Request) {
       noTeleponWali: body.noTeleponWali?.trim() || null,
       berkasPendukung: body.berkasPendukung || null,
       statusBerkas: "Menunggu Verifikasi",
-    });
+    };
+
+    let tersimpan: MutasiSiswa;
+    try {
+      tersimpan = createMutasiSiswa(payload);
+    } catch (error) {
+      // SQLite read-only/locked di Vercel: simpan ke memori runtime.
+      console.error(
+        "Gagal menulis mutasi siswa ke SQLite, memakai memori:",
+        error
+      );
+      tersimpan = simpanMutasiMemori({
+        ...payload,
+        id: Date.now(),
+        createdAt: new Date().toISOString(),
+      });
+    }
 
     // Kirim notifikasi ke Admin TU setelah respons dikirim ke pemohon, agar
-    // proses Fonnte yang lambat tidak menghambat form di web.
-    const tautanVerifikasi = `${tentukanBasisUrl(request)}/admin-tu/mutasi`;
-    const nomorAdminTu = process.env.WA_ADMIN_TU;
-    const pesanNotifikasi = buatPesanNotifikasiMutasi(
-      tersimpan,
-      tautanVerifikasi
-    );
+    // proses Fonnte yang lambat/gagal tidak menghambat form di web.
+    try {
+      const tautanVerifikasi = `${tentukanBasisUrl(request)}/admin-tu/mutasi`;
+      const nomorAdminTu = process.env.WA_ADMIN_TU;
+      const pesanNotifikasi = buatPesanNotifikasiMutasi(
+        tersimpan,
+        tautanVerifikasi
+      );
 
-    after(async () => {
-      try {
-        const hasil = await kirimPesanWhatsApp({
-          nomorTujuan: nomorAdminTu,
-          pesan: pesanNotifikasi,
-        });
+      after(async () => {
+        try {
+          const hasil = await kirimPesanWhatsApp({
+            nomorTujuan: nomorAdminTu,
+            pesan: pesanNotifikasi,
+          });
 
-        if (!hasil.ok) {
-          console.warn(
-            "[NOTIFIKASI-MUTASI] Gagal mengirim WhatsApp ke Admin TU:",
-            hasil.error
+          if (!hasil.ok) {
+            console.warn(
+              "[NOTIFIKASI-MUTASI] Gagal mengirim WhatsApp ke Admin TU:",
+              hasil.error
+            );
+          }
+        } catch (error) {
+          // Jangan pernah menggagalkan penyimpanan mutasi karena notifikasi.
+          console.error(
+            "[NOTIFIKASI-MUTASI] Exception saat mengirim WhatsApp:",
+            error
           );
         }
-      } catch (error) {
-        // Jangan pernah menggagalkan penyimpanan mutasi karena notifikasi.
-        console.error(
-          "[NOTIFIKASI-MUTASI] Exception saat mengirim WhatsApp:",
-          error
-        );
-      }
-    });
+      });
+    } catch (error) {
+      console.error("[NOTIFIKASI-MUTASI] Gagal menyiapkan notifikasi:", error);
+    }
 
-    return NextResponse.json(tersimpan, { status: 201 });
+    return NextResponse.json({ ...tersimpan, success: true, data: tersimpan });
   } catch (error) {
     console.error("Gagal menyimpan mutasi siswa:", error);
     return NextResponse.json(

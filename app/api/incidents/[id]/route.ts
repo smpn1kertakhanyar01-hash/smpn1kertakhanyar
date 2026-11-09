@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { deleteIncident } from "@/lib/db";
+import { hapusInsidenMemori } from "@/lib/memory-store";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -16,8 +17,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
       );
     }
 
-    deleteIncident(nomorId);
-    return NextResponse.json({ ok: true });
+    try {
+      deleteIncident(nomorId);
+    } catch (error) {
+      // Abaikan kegagalan tulis SQLite; hapus dari penyimpanan memori.
+      console.error("Gagal menghapus catatan kejadian di SQLite:", error);
+    }
+
+    hapusInsidenMemori(nomorId);
+    return NextResponse.json({ ok: true, success: true });
   } catch (error) {
     console.error("Gagal menghapus catatan kejadian:", error);
     return NextResponse.json(

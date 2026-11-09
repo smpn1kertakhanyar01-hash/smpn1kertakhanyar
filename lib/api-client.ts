@@ -63,6 +63,19 @@ function post<T>(url: string, body: unknown): Promise<T> {
   });
 }
 
+/**
+ * Endpoint pencatatan dapat membalas data langsung atau dibungkus
+ * `{ success, message, data }` saat SQLite Vercel gagal ditulisi.
+ * Fungsi ini mengembalikan bentuk data yang seragam untuk frontend.
+ */
+function bukaBungkusan<T>(hasil: T | { data?: T }): T {
+  if (hasil && typeof hasil === "object" && "data" in hasil) {
+    const data = (hasil as { data?: T }).data;
+    if (data !== undefined) return data;
+  }
+  return hasil as T;
+}
+
 export const api = {
   login(
     payload: LoginPayload
@@ -145,7 +158,10 @@ export const api = {
   createLeaveRequest(
     payload: Omit<SuratIzinItem, "id">
   ): Promise<SuratIzinItem> {
-    return post<SuratIzinItem>("/api/leave-requests", payload);
+    return post<SuratIzinItem | { data?: SuratIzinItem }>(
+      "/api/leave-requests",
+      payload
+    ).then((hasil) => bukaBungkusan<SuratIzinItem>(hasil));
   },
 
   updateLeaveRequestStatus(
@@ -175,7 +191,10 @@ export const api = {
       waktu?: string;
     }
   ): Promise<CatatanKejadianItem> {
-    return post<CatatanKejadianItem>("/api/incidents", payload);
+    return post<CatatanKejadianItem | { data?: CatatanKejadianItem }>(
+      "/api/incidents",
+      payload
+    ).then((hasil) => bukaBungkusan<CatatanKejadianItem>(hasil));
   },
 
   deleteIncident(id: number): Promise<{ ok: true }> {
@@ -285,7 +304,10 @@ export const api = {
   },
 
   createMutasiSiswa(payload: MutasiSiswaPayload): Promise<MutasiSiswa> {
-    return post<MutasiSiswa>("/api/mutasi-siswa", payload);
+    return post<MutasiSiswa | { data?: MutasiSiswa }>(
+      "/api/mutasi-siswa",
+      payload
+    ).then((hasil) => bukaBungkusan<MutasiSiswa>(hasil));
   },
 
   updateMutasiSiswa(

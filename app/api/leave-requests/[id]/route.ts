@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { sesiDariPermintaan } from "@/lib/api-auth";
 import { updateLeaveRequestStatus } from "@/lib/db";
+import { perbaruiSuratIzinMemori } from "@/lib/memory-store";
+import type { SuratIzinItem } from "@/lib/types";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -39,12 +41,36 @@ export async function PATCH(request: Request, context: RouteContext) {
         ? "Admin TU / Petugas Sekolah"
         : sesi.nama || "Guru Piket";
 
-    const hasil = updateLeaveRequestStatus(
-      nomorId,
+    const perubahan = {
       status,
-      body.catatan,
-      verifikator
-    );
+      ...(body.catatan ? { catatanPenolakan: body.catatan } : {}),
+      ...(status === "Disetujui"
+        ? {
+            disetujuiOleh: verifikator,
+            tanggalPersetujuan: new Date().toLocaleDateString("id-ID"),
+          }
+        : {}),
+      diverifikasiOleh: verifikator,
+    };
+
+    let hasil: SuratIzinItem | null = null;
+    try {
+      hasil = updateLeaveRequestStatus(
+        nomorId,
+        status,
+        body.catatan,
+        verifikator
+      );
+    } catch (error) {
+      // SQLite read-only di Vercel: perbarui salinan memori runtime.
+      console.error("Gagal memperbarui surat izin di SQLite:", error);
+      hasil = null;
+    }
+
+    if (!hasil) {
+      hasil = perbaruiSuratIzinMemori(nomorId, perubahan);
+    }
+
     if (!hasil) {
       return NextResponse.json(
         { error: "Pengajuan izin tidak ditemukan." },
@@ -52,7 +78,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    return NextResponse.json(hasil);
+    return NextResponse.json({ ...hasil, success: true });
   } catch (error) {
     console.error("Gagal memperbarui status izin:", error);
     return NextResponse.json(
