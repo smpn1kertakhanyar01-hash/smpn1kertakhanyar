@@ -18,6 +18,10 @@ import {
   AKUN_SISWA_SEED,
   USERNAME_SISWA_LAMA,
 } from "./data";
+import {
+  apakahTokenSesiFallback,
+  bacaTokenSesiFallback,
+} from "./fallback-auth";
 import type {
   AgendaAkademik,
   AkunSandiSiswa,
@@ -921,6 +925,9 @@ export function createAuthSession(
 export function getSessionUser(token: string): SesiPengguna | null {
   if (!token) return null;
 
+  // Sesi fallback diverifikasi tanpa menyentuh database (aman untuk Vercel).
+  if (apakahTokenSesiFallback(token)) return bacaTokenSesiFallback(token);
+
   const row = getDb()
     .prepare(
       `SELECT
@@ -954,6 +961,8 @@ export function getSessionUser(token: string): SesiPengguna | null {
 
 export function deleteAuthSession(token: string): void {
   if (!token) return;
+  // Token fallback bersifat stateless; tidak ada baris database yang dihapus.
+  if (apakahTokenSesiFallback(token)) return;
   getDb().prepare("DELETE FROM auth_sessions WHERE token = ?").run(token);
 }
 
