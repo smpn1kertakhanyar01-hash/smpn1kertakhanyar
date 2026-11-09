@@ -16,6 +16,9 @@ export const PASSWORD_PETUGAS_FALLBACK = [
   "adminTUkece",
 ] as const;
 
+/** Username yang memperoleh peran penuh Admin Tata Usaha. */
+const USERNAME_ADMIN_TU = ["admintu", "petugas.smpn1kh"] as const;
+
 export function cariAkunPetugasFallback(
   identifier: string,
   password: string
@@ -32,12 +35,24 @@ export function cariAkunPetugasFallback(
     return null;
   }
 
+  // Peran dipisahkan: "guru" hanya memperoleh akses kesiswaan, sedangkan
+  // "admintu" dan "petugas.smpn1kh" memperoleh akses penuh Tata Usaha.
+  if ((USERNAME_ADMIN_TU as readonly string[]).includes(username)) {
+    return {
+      id: -1,
+      username,
+      role: "guru",
+      staffRole: "ADMIN_TU",
+      nama: "Petugas Tata Usaha",
+    };
+  }
+
   return {
-    id: -1,
+    id: -2,
     username,
     role: "guru",
-    staffRole: "ADMIN_TU",
-    nama: "Petugas Tata Usaha & Kesiswaan",
+    staffRole: "GURU_PIKET",
+    nama: "Guru Piket / Pengajar",
   };
 }
 

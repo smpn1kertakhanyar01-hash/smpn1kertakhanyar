@@ -6,13 +6,17 @@ import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
 import { STATUS_PRESENSI } from "@/lib/constants";
+import { daftarSiswaFallback, normalisasiKelasSiswa } from "@/lib/data";
 import type { CatatanAbsen, Siswa, StatusPresensi } from "@/lib/types";
 import { ambilTanggalHariIni, ambilWaktuSekarang } from "@/lib/utils";
+
+/** Kelas yang selalu tersedia pada pilihan presensi. */
+const KELAS_PRESENSI_DASAR = ["9A", "9B"] as const;
 
 export default function PresensiKelasPage() {
   const router = useRouter();
   const [daftarSiswa, setDaftarSiswa] = useState<Siswa[]>([]);
-  const [kelasTerpilih, setKelasTerpilih] = useState<string>("VII A");
+  const [kelasTerpilih, setKelasTerpilih] = useState<string>("9A");
   const [tanggal, setTanggal] = useState<string>("");
   const [statusMap, setStatusMap] = useState<Record<string, StatusPresensi>>({});
   const [notifSukses, setNotifSukses] = useState(false);
@@ -31,20 +35,32 @@ export default function PresensiKelasPage() {
       .getStudents()
       .then((data) => {
         if (!masihAktif) return;
-        setDaftarSiswa(data);
 
-        const kelasPertama = data[0]?.kelas;
-        if (kelasPertama) {
-          setKelasTerpilih((sebelumnya) =>
-            data.some((siswa) => siswa.kelas === sebelumnya)
-              ? sebelumnya
-              : kelasPertama
-          );
-        }
+        const dataSiswa = data.map((siswa) => ({
+          ...siswa,
+          kelas: normalisasiKelasSiswa(siswa.kelas),
+        }));
+        const tampil = dataSiswa.length > 0 ? dataSiswa : daftarSiswaFallback();
+        setDaftarSiswa(tampil);
+
+        // Default kelas pertama adalah 9A; jika tidak ada, pakai kelas
+        // pertama yang benar-benar memiliki siswa.
+        setKelasTerpilih((sebelumnya) => {
+          if (tampil.some((siswa) => siswa.kelas === sebelumnya)) {
+            return sebelumnya;
+          }
+          if (tampil.some((siswa) => siswa.kelas === "9A")) return "9A";
+          return tampil[0]?.kelas ?? KELAS_PRESENSI_DASAR[0];
+        });
       })
       .catch((error) => {
-        console.error("Gagal memuat data siswa:", error);
-        alert("Gagal memuat daftar siswa. Silakan muat ulang halaman.");
+        if (!masihAktif) return;
+        console.error("Gagal memuat data siswa, memakai data fallback:", error);
+        // Tetap tampilkan 63 siswa asli saat API/SQLite Vercel tidak terbaca.
+        setDaftarSiswa(daftarSiswaFallback());
+        setKelasTerpilih((sebelumnya) =>
+          sebelumnya === "9A" || sebelumnya === "9B" ? sebelumnya : "9A"
+        );
       });
 
     return () => {
@@ -125,7 +141,13 @@ export default function PresensiKelasPage() {
     }
   };
 
-  const kelasTersedia = Object.keys(siswaPerKelas);
+  const kelasTersedia = useMemo(() => {
+    const kelas = new Set<string>(KELAS_PRESENSI_DASAR);
+    Object.keys(siswaPerKelas).forEach((k) => kelas.add(k));
+    return Array.from(kelas).sort((a, b) =>
+      a.localeCompare(b, "id", { numeric: true })
+    );
+  }, [siswaPerKelas]);
 
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-800 font-sans pb-16">

@@ -41,8 +41,9 @@ export async function POST(request: Request) {
     }
 
     // Cek kredensial darurat lebih dulu agar login tetap berhasil di Vercel.
-    // Petugas memakai satu pintu: guru/admintu/petugas.smpn1kh dengan salah
-    // satu kata sandi resmi, dan otomatis mendapat hak penuh ADMIN_TU.
+    // "guru" mendapat peran GURU_PIKET, sedangkan "admintu" dan
+    // "petugas.smpn1kh" mendapat peran ADMIN_TU. Keduanya lolos validasi
+    // karena fallback dicek sebelum query database.
     const userFallback =
       role === "guru"
         ? cariAkunPetugasFallback(identifier, password)

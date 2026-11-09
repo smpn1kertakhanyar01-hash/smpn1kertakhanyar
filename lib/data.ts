@@ -1,4 +1,9 @@
-import type { AgendaAkademik, AkunSandiSiswa, AkunSiswa } from "./types";
+import type {
+  AgendaAkademik,
+  AkunSandiSiswa,
+  AkunSiswa,
+  Siswa,
+} from "./types";
 
 export interface CatatanAbsenSeed {
   nisn: string;
@@ -96,6 +101,34 @@ export const AKUN_SISWA_SEED: AkunSiswa[] = Object.values(DATA_SISWA_KELAS)
     ...siswa,
     sandi: sandiSiswaDariNisn(siswa.nisn),
   }));
+
+/**
+ * Menyeragamkan label kelas lama (IX A / IX B) menjadi format baru (9A / 9B)
+ * agar data dari database lama tetap muncul pada pilihan kelas presensi.
+ */
+export function normalisasiKelasSiswa(kelas: string): string {
+  const bersih = kelas.trim();
+  const romawi = bersih.match(/^(VII|VIII|IX)\s*([ABC])$/i);
+  if (romawi) {
+    const tingkat = { VII: "7", VIII: "8", IX: "9" }[
+      romawi[1].toUpperCase() as "VII" | "VIII" | "IX"
+    ];
+    return `${tingkat}${romawi[2].toUpperCase()}`;
+  }
+  return bersih;
+}
+
+/**
+ * Daftar siswa untuk tampilan darurat (mis. saat SQLite Vercel tidak dapat
+ * dibaca). Isinya sama dengan 63 siswa asli pada AKUN_SISWA_SEED.
+ */
+export function daftarSiswaFallback(): Siswa[] {
+  return AKUN_SISWA_SEED.map((akun) => ({
+    nisn: akun.nisn,
+    nama: akun.nama,
+    kelas: akun.kelas,
+  }));
+}
 
 /**
  * Daftar akun siswa untuk tampilan darurat (mis. saat SQLite Vercel tidak
