@@ -1,36 +1,80 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Portal Kesiswaan SMP Negeri 1 Kertak Hanyar
 
-## Getting Started
+Aplikasi Next.js untuk layanan kesiswaan: surat izin, presensi, jurnal kejadian, mutasi siswa, dan kalender akademik.
 
-First, run the development server:
+## Menjalankan Aplikasi
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Buka [http://localhost:3000](http://localhost:3000).
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+### Konfigurasi Notifikasi WhatsApp (Fonnte)
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Buat file `.env.local` dan isi:
 
-## Learn More
+```bash
+FONNTE_TOKEN="token-fonnte-anda"
+WA_ADMIN_TU="628xxxxxxxxxx"
+# Opsional: URL publik untuk tautan verifikasi di pesan WhatsApp.
+# Jika kosong, aplikasi memakai host dari request yang masuk.
+APP_URL="https://domain-sekolah.sch.id"
+```
 
-To learn more about Next.js, take a look at the following resources:
+`WA_ADMIN_TU` wajib memakai format `62` tanpa spasi atau strip. Setiap
+pengajuan mutasi siswa yang tersimpan akan mengirim notifikasi ke nomor
+tersebut, dan hasilnya dicatat di tabel `log_notifikasi_wa`.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Build produksi:
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+```bash
+npm run build
+npm run start
+```
 
-## Deploy on Vercel
+## Database
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+Data disimpan di SQLite melalui `better-sqlite3`:
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- Lokasi default: `data/sekolah.db`
+- File database dibuat otomatis saat pertama kali dipakai.
+- Skema dan data awal (siswa, akun demo, agenda akademik) dibuat otomatis.
+- Lokasi lain dapat diatur dengan environment variable `DATABASE_PATH`.
+- Folder `data/` sudah diabaikan oleh Git.
+
+Migrasi tabel kesiswaan bersifat idempoten dan dapat dijalankan manual:
+
+```bash
+npm run db:migrate
+```
+
+Tabel yang disiapkan: `kalender_akademik`, `log_notifikasi_wa`,
+`kategori_kejadian`, dan `mutasi_siswa` (foreign key ke akun siswa di tabel
+`users`). Skema yang sama juga dipasang otomatis oleh `lib/db.ts`.
+
+Data localStorage lama (presensi, surat izin, jurnal, mutasi) dimigrasikan otomatis satu kali saat beranda dibuka.
+
+### Akun Demo
+
+| Peran | NISN / User | Kata Sandi |
+| --- | --- | --- |
+| Guru | `guru`, `admin`, atau `piket` | `@Smpn1KH#` |
+| Admin TU | `petugas.smpn1kh` | `adminTUkece` |
+| Siswa (demo umum) | `siswa` | `siswa123` |
+
+Siswa kelas IX A dan IX B masuk menggunakan NISN masing-masing dengan kata sandi
+`"smp" + 4 digit terakhir NISN` (contoh: NISN `0119741828` → sandi `smp1828`).
+
+Siswa baru dapat mendaftar melalui halaman **Aktivasi Akun Siswa** (`/register-siswa`).
+
+## Struktur Penting
+
+- `lib/db.ts` — skema SQLite, seed, dan seluruh operasi database.
+- `app/api/` — route handler API untuk autentikasi dan data kesiswaan.
+- `lib/api-client.ts` — pemanggil API bertipe untuk komponen klien.
+- `lib/storage.ts` — helper sesi login di browser.
+- `lib/migrate.ts` — migrasi satu kali data localStorage lama ke database.
+
+Sesi login tetap disimpan di browser (localStorage), sedangkan akun dan seluruh data aplikasi disimpan di SQLite.
