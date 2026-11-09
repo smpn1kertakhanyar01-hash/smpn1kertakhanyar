@@ -4,12 +4,13 @@ import path from "node:path";
 import Database from "better-sqlite3";
 import {
   AKUN_ADMIN_TU,
+  AKUN_ADMIN_TU_ALTERNATIF,
   AKUN_GURU_DEMO,
   KATEGORI_PENGAMBILAN_IJAZAH,
+  PERAN_LOGIN_PEGAWAI,
   PERAN_PEGAWAI,
   STATUS_PRESENSI,
   SYARAT_IJAZAH_DEFAULT,
-  USERNAME_ADMIN_TU_LAMA,
 } from "./constants";
 import {
   AGENDA_AKADEMIK,
@@ -27,6 +28,7 @@ import type {
   MutasiItem,
   Pengguna,
   PeranPegawai,
+  PeranPengguna,
   RegisterPayload,
   SesiPengguna,
   Siswa,
@@ -324,6 +326,15 @@ function normalisasiPeranPegawai(role: string): PeranPegawai {
     : "GURU_PIKET";
 }
 
+/**
+ * Portal pegawai memakai `role: "guru"` pada payload login, tetapi akun staf
+ * dapat tersimpan dengan role database `GURU_PIKET`, `WALI_KELAS`, atau
+ * `ADMIN_TU`. Semua peran tersebut harus diizinkan masuk lewat portal yang sama.
+ */
+function daftarPeranLogin(role: PeranPengguna): readonly string[] {
+  return role === "guru" ? PERAN_LOGIN_PEGAWAI : ["siswa"];
+}
+
 function hashPassword(password: string): string {
   const salt = crypto.randomBytes(16).toString("hex");
   const hash = crypto.scryptSync(password, salt, 64).toString("hex");
@@ -419,56 +430,38 @@ function pastikanAkunGuru(db: Database.Database): void {
 }
 
 /**
- * Akun bawaan staf Tata Usaha. Hanya dibuat jika belum ada agar kata sandi
- * yang sudah diganti melalui dashboard TU tidak tertimpa saat server restart.
- * Akun lama `admintu` dimigrasikan otomatis menjadi satu akun petugas tunggal.
+ * Akun bawaan staf Tata Usaha. Akun utama (`petugas.smpn1kh`) dan akun
+ * alternatif (`admintu`) dipastikan selalu ada. Kata sandi akun yang sudah
+ * ada tidak ditimpa agar perubahan sandi dari dashboard TU tetap berlaku.
  */
 function pastikanAkunAdminTu(db: Database.Database): void {
   const cariAkun = db.prepare(
     "SELECT id FROM users WHERE username = ? COLLATE NOCASE"
   );
-  const akunBaru = cariAkun.get(AKUN_ADMIN_TU.username) as
-    | { id: number }
-    | undefined;
-
-  if (akunBaru) {
-    // Jaga peran dan nama tetap sesuai tanpa menimpa kata sandi yang sudah diganti.
-    db.prepare("UPDATE users SET role = ?, nama = ? WHERE id = ?").run(
-      AKUN_ADMIN_TU.role,
-      AKUN_ADMIN_TU.nama,
-      akunBaru.id
-    );
-    return;
-  }
-
-  const akunLama = cariAkun.get(USERNAME_ADMIN_TU_LAMA) as
-    | { id: number }
-    | undefined;
-
-  if (akunLama) {
-    db.prepare(
-      `UPDATE users
-       SET username = ?, password_hash = ?, role = ?, nama = ?
-       WHERE id = ?`
-    ).run(
-      AKUN_ADMIN_TU.username,
-      hashPassword(AKUN_ADMIN_TU.password),
-      AKUN_ADMIN_TU.role,
-      AKUN_ADMIN_TU.nama,
-      akunLama.id
-    );
-    return;
-  }
-
-  db.prepare(
+  const perbaruiProfil = db.prepare(
+    "UPDATE users SET role = ?, nama = ? WHERE id = ?"
+  );
+  const simpanAkun = db.prepare(
     `INSERT INTO users (username, password_hash, role, nama)
      VALUES (?, ?, ?, ?)`
-  ).run(
-    AKUN_ADMIN_TU.username,
-    hashPassword(AKUN_ADMIN_TU.password),
-    AKUN_ADMIN_TU.role,
-    AKUN_ADMIN_TU.nama
   );
+
+  for (const akun of [AKUN_ADMIN_TU, AKUN_ADMIN_TU_ALTERNATIF]) {
+    const akunAda = cariAkun.get(akun.username) as { id: number } | undefined;
+
+    if (akunAda) {
+      // Jaga peran dan nama tetap sesuai tanpa menimpa kata sandi yang sudah diganti.
+      perbaruiProfil.run(akun.role, akun.nama, akunAda.id);
+      continue;
+    }
+
+    simpanAkun.run(
+      akun.username,
+      hashPassword(akun.password),
+      akun.role,
+      akun.nama
+    );
+  }
 }
 
 function pastikanAkunDemoSiswa(db: Database.Database): void {
@@ -834,17 +827,15 @@ export function loginUser({
   password,
 }: LoginPayload): Pengguna | null {
   const db = getDb();
-  const daftarPeran =
-    role === "guru"
-      ? "'guru', 'GURU_PIKET', 'WALI_KELAS', 'ADMIN_TU'"
-      : "'siswa'";
+  const daftarPeran = daftarPeranLogin(role);
+  const placeholders = daftarPeran.map(() => "?").join(", ");
   const row = db
     .prepare(
       `SELECT id, username, password_hash, role, nama, nisn, kelas
        FROM users
-       WHERE username = ? COLLATE NOCASE AND role IN (${daftarPeran})`
+       WHERE username = ? COLLATE NOCASE AND role IN (${placeholders})`
     )
-    .get(identifier) as UserRow | undefined;
+    .get(identifier, ...daftarPeran) as UserRow | undefined;
 
   if (!row || !verifyPassword(password, row.password_hash)) return null;
 
@@ -858,6 +849,51 @@ export function loginUser({
     nama: row.nama,
     nisn: row.nisn ?? undefined,
     kelas: row.kelas ?? undefined,
+  };
+}
+
+export interface DiagnosaLogin {
+  akunDitemukan: boolean;
+  peranTersimpan: string | null;
+  peranDiizinkan: boolean;
+  kataSandiCocok: boolean;
+}
+
+/**
+ * Ringkasan penyebab kegagalan login untuk keperluan log server.
+ * Tidak pernah mengembalikan kata sandi mentah.
+ */
+export function diagnosaLogin({
+  role,
+  identifier,
+  password,
+}: LoginPayload): DiagnosaLogin {
+  const row = getDb()
+    .prepare(
+      `SELECT password_hash, role
+       FROM users
+       WHERE username = ? COLLATE NOCASE`
+    )
+    .get(identifier) as
+    | { password_hash: string; role: string }
+    | undefined;
+
+  if (!row) {
+    return {
+      akunDitemukan: false,
+      peranTersimpan: null,
+      peranDiizinkan: false,
+      kataSandiCocok: false,
+    };
+  }
+
+  const peranDiizinkan = daftarPeranLogin(role).includes(row.role);
+
+  return {
+    akunDitemukan: true,
+    peranTersimpan: row.role,
+    peranDiizinkan,
+    kataSandiCocok: verifyPassword(password, row.password_hash),
   };
 }
 

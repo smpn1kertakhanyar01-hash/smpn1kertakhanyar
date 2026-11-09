@@ -61,7 +61,7 @@ Data localStorage lama (presensi, surat izin, jurnal, mutasi) dimigrasikan otoma
 | Peran | NISN / User | Kata Sandi |
 | --- | --- | --- |
 | Guru | `guru`, `admin`, atau `piket` | `@Smpn1KH#` |
-| Admin TU | `petugas.smpn1kh` | `adminTUkece` |
+| Admin TU | `petugas.smpn1kh` atau `admintu` | `adminTUkece` |
 | Siswa (demo umum) | `siswa` | `siswa123` |
 
 Siswa kelas IX A dan IX B masuk menggunakan NISN masing-masing dengan kata sandi

@@ -35,18 +35,36 @@ export const AKUN_GURU_DEMO = {
 export const AKUN_ADMIN_TU = {
   username: "petugas.smpn1kh",
   password: "adminTUkece",
-  nama: "Petugas Kesiswaan & Tata Usaha",
+  nama: "Petugas Tata Usaha & Kesiswaan",
   role: "ADMIN_TU",
 } as const;
 
-/** Username akun Admin TU lama yang dimigrasikan ke akun petugas tunggal. */
-export const USERNAME_ADMIN_TU_LAMA = "admintu";
+/**
+ * Akun alternatif Admin TU agar login tetap bisa dilakukan bila petugas
+ * menggunakan username lama `admintu`.
+ */
+export const AKUN_ADMIN_TU_ALTERNATIF = {
+  username: "admintu",
+  password: "adminTUkece",
+  nama: "Petugas Tata Usaha & Kesiswaan",
+  role: "ADMIN_TU",
+} as const;
 
 /** Peran pegawai yang disimpan pada kolom `users.role`. */
 export const PERAN_PEGAWAI = [
   "GURU_PIKET",
   "WALI_KELAS",
   "ADMIN_TU",
+] as const;
+
+/**
+ * Peran database yang boleh masuk melalui portal guru/pegawai.
+ * Login portal mengirim `role: "guru"`, sedangkan akun staf dapat tersimpan
+ * sebagai `GURU_PIKET`, `WALI_KELAS`, atau `ADMIN_TU`.
+ */
+export const PERAN_LOGIN_PEGAWAI = [
+  "guru",
+  ...PERAN_PEGAWAI,
 ] as const;
 
 /** Cookie optimistis untuk proteksi rute oleh proxy. */
