@@ -8,17 +8,20 @@ import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
-import { clearStore } from "@/lib/client-store";
+import { clearStore, setStore } from "@/lib/client-store";
 import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH } from "@/lib/constants";
 import { daftarAkunSandiSiswaFallback } from "@/lib/data";
 import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
+  PENGAJUAN_IZIN_STORAGE_KEY,
   ambilDaftarIzinLengkap,
+  bacaPengajuanIzinLokal,
   berlanggananPerubahanIzin,
   hapusSemuaOverrideIzin,
   simpanOverrideIzin,
   terapkanOverrideIzin,
 } from "@/lib/izin-store";
+import { CONTOH_SURAT_IZIN } from "@/lib/memory-store";
 import {
   ambilJurnalLengkap,
   berlanggananPerubahanJurnal,
@@ -65,6 +68,67 @@ const STATISTIK_FALLBACK = {
   izinMenunggu: 4,
   izinDisetujui: 17,
 } as const;
+
+/** Penanda agar daftar izin tidak diisi ulang setelah "Hapus Semua". */
+const IZIN_TERHAPUS_SEMUA_KEY = "izin_terhapus_semua";
+
+/** Salinan status per ID agar pembaruan baris tetap tersimpan di browser. */
+const STATUS_IZIN_PER_ID_KEY = "status_izin_per_id";
+
+interface StatusIzinPerId {
+  id: number;
+  kodeBerkas?: string;
+  nama?: string;
+  nisn?: string;
+  status: string;
+  diperbaruiPada: string;
+}
+
+function bacaFlagIzinTerhapusSemua(): boolean {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return window.localStorage.getItem(IZIN_TERHAPUS_SEMUA_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function simpanStatusIzinPerId(item: SuratIzinItem, status: string): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const mentah = window.localStorage.getItem(STATUS_IZIN_PER_ID_KEY);
+    const petaMentah = mentah ? (JSON.parse(mentah) as unknown) : {};
+    const peta: Record<string, StatusIzinPerId> =
+      petaMentah && typeof petaMentah === "object" && !Array.isArray(petaMentah)
+        ? (petaMentah as Record<string, StatusIzinPerId>)
+        : {};
+
+    peta[String(item.id)] = {
+      id: item.id,
+      kodeBerkas: item.kodeBerkas,
+      nama: item.nama,
+      nisn: item.nisn,
+      status,
+      diperbaruiPada: new Date().toISOString(),
+    };
+
+    window.localStorage.setItem(STATUS_IZIN_PER_ID_KEY, JSON.stringify(peta));
+  } catch (error) {
+    console.error("Gagal menyimpan status izin per ID:", error);
+  }
+}
+
+function hapusPetaStatusIzin(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(STATUS_IZIN_PER_ID_KEY);
+  } catch (error) {
+    console.error("Gagal membersihkan peta status izin:", error);
+  }
+}
 
 interface FormKejadian {
   guruPiket: string;
@@ -121,6 +185,9 @@ export default function DashboardGuruPage() {
   const [tabAktif, setTabAktif] = useState<TabAktif>("izin");
   const [daftarPresensi, setDaftarPresensi] = useState<PresensiItem[]>([]);
   const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
+  // Menandai daftar izin sengaja dikosongkan lewat "Hapus Semua" agar data
+  // contoh/server tidak dimuat ulang saat halaman di-refresh.
+  const [izinTerhapusSemua, setIzinTerhapusSemua] = useState(false);
   const [daftarKejadian, setDaftarKejadian] = useState<CatatanKejadianItem[]>([]);
   // Statistik cadangan hanya dipakai selama data pertama kali dimuat; setelah
   // itu angka kartu mengikuti isi store agar "Hapus Semua" langsung jadi 0.
@@ -213,6 +280,19 @@ export default function DashboardGuruPage() {
 
     // 2. Muat data dari database
     let masihAktif = true;
+    let izinSengajaDikosongkan = bacaFlagIzinTerhapusSemua();
+
+    // Bila guru sudah menekan "Hapus Semua" tetapi siswa mengirim pengajuan
+    // baru, tampilkan pengajuan baru tersebut dan anggap penanda selesai.
+    if (izinSengajaDikosongkan && bacaPengajuanIzinLokal().length > 0) {
+      try {
+        window.localStorage.removeItem(IZIN_TERHAPUS_SEMUA_KEY);
+      } catch (error) {
+        console.error("Gagal menghapus penanda hapus semua izin:", error);
+      }
+      izinSengajaDikosongkan = false;
+    }
+    setIzinTerhapusSemua(izinSengajaDikosongkan);
 
     const muatData = async () => {
       try {
@@ -226,7 +306,9 @@ export default function DashboardGuruPage() {
         if (!masihAktif) return;
 
         setDaftarPresensi(gabungPresensi(presensi, bacaPresensiLokal()));
-        setDaftarIzin(ambilDaftarIzinLengkap(izin));
+        setDaftarIzin(
+          izinSengajaDikosongkan ? [] : ambilDaftarIzinLengkap(izin)
+        );
         setDaftarKejadian(ambilJurnalLengkap(kejadian));
         setPengunjungHariIni(statistik.hariIni);
         setRiwayatKunjungan(statistik.riwayat);
@@ -236,7 +318,9 @@ export default function DashboardGuruPage() {
         // serverless tidak dapat dihubungi atau mengembalikan data kosong.
         if (masihAktif) {
           setDaftarPresensi(gabungPresensi([], bacaPresensiLokal()));
-          setDaftarIzin(ambilDaftarIzinLengkap([]));
+          setDaftarIzin(
+            izinSengajaDikosongkan ? [] : ambilDaftarIzinLengkap([])
+          );
           setDaftarKejadian(ambilJurnalLengkap());
         }
       } finally {
@@ -305,6 +389,22 @@ export default function DashboardGuruPage() {
   useEffect(() => {
     const berhenti = berlanggananPerubahanIzin(() => {
       if (!apakahLogin("guru")) return;
+      if (bacaFlagIzinTerhapusSemua()) {
+        // Pertahankan tabel kosong, kecuali ada pengajuan baru dari siswa
+        // setelah "Hapus Semua" ditekan.
+        if (bacaPengajuanIzinLokal().length === 0) {
+          setIzinTerhapusSemua(true);
+          setDaftarIzin([]);
+          return;
+        }
+
+        try {
+          window.localStorage.removeItem(IZIN_TERHAPUS_SEMUA_KEY);
+        } catch (error) {
+          console.error("Gagal menghapus penanda hapus semua izin:", error);
+        }
+        setIzinTerhapusSemua(false);
+      }
       setDaftarIzin(ambilDaftarIzinLengkap());
     });
     return berhenti;
@@ -416,6 +516,7 @@ export default function DashboardGuruPage() {
 
       simpanOverrideIzin(izinLokal);
       const izinLokalTerbaru = terapkanOverrideIzin(izinLokal);
+      simpanStatusIzinPerId(izinLokalTerbaru, izinLokalTerbaru.status);
       setDaftarIzin((prev) =>
         prev.map((item) => (item.id === id ? izinLokalTerbaru : item))
       );
@@ -433,6 +534,7 @@ export default function DashboardGuruPage() {
           ...hasil,
           status: hasil.status ?? statusBaru,
         });
+        simpanStatusIzinPerId(izinTerbaru, izinTerbaru.status);
         setDaftarIzin((prev) =>
           prev.map((item) => (item.id === id ? izinTerbaru : item))
         );
@@ -618,16 +720,47 @@ Terima kasih.`;
   const handleResetIzin = async () => {
     if (!confirm("Hapus seluruh arsip permohonan surat izin?")) return;
 
+    // Tandai bahwa daftar memang sengaja dikosongkan agar refresh tidak
+    // memunculkan kembali data contoh/fallback.
+    try {
+      window.localStorage.setItem(IZIN_TERHAPUS_SEMUA_KEY, "true");
+    } catch (error) {
+      console.error("Gagal menyimpan penanda hapus semua izin:", error);
+    }
+    setIzinTerhapusSemua(true);
+
     // Kosongkan store lokal terlebih dahulu agar tabel benar-benar kosong
     // dan data contoh/server tidak muncul kembali.
+    hapusPetaStatusIzin();
     hapusSemuaOverrideIzin();
     setDaftarIzin([]);
+    setMemuatDataUtama(false);
 
     try {
       await api.deleteAllLeaveRequests();
     } catch (error) {
       console.error("Gagal menghapus salinan surat izin di server:", error);
     }
+  };
+
+  // Munculkan kembali data simulasi setelah tabel dikosongkan "Hapus Semua".
+  const handlePulihkanDataContoh = () => {
+    try {
+      window.localStorage.removeItem(IZIN_TERHAPUS_SEMUA_KEY);
+    } catch (error) {
+      console.error("Gagal menghapus penanda hapus semua izin:", error);
+    }
+
+    setIzinTerhapusSemua(false);
+    hapusPetaStatusIzin();
+    setStore(PENGAJUAN_IZIN_STORAGE_KEY, CONTOH_SURAT_IZIN);
+
+    const daftarPulih = ambilDaftarIzinLengkap();
+    setDaftarIzin(daftarPulih);
+    setMemuatDataUtama(false);
+    setNotifikasiSukses(
+      `Data contoh berhasil dipulihkan (${daftarPulih.length} pengajuan).`
+    );
   };
 
   const terapkanHasilMutasi = (hasil: MutasiSiswa) => {
@@ -894,12 +1027,16 @@ Terima kasih.`;
   const angkaInsiden = memuatDataUtama
     ? STATISTIK_FALLBACK.insiden
     : daftarKejadian.length;
-  const angkaIzinMenunggu = memuatDataUtama
-    ? STATISTIK_FALLBACK.izinMenunggu
-    : izinMenunggu;
-  const angkaIzinDisetujui = memuatDataUtama
-    ? STATISTIK_FALLBACK.izinDisetujui
-    : izinDisetujui;
+  const angkaIzinMenunggu = izinTerhapusSemua
+    ? 0
+    : memuatDataUtama
+      ? STATISTIK_FALLBACK.izinMenunggu
+      : izinMenunggu;
+  const angkaIzinDisetujui = izinTerhapusSemua
+    ? 0
+    : memuatDataUtama
+      ? STATISTIK_FALLBACK.izinDisetujui
+      : izinDisetujui;
   const ijazahBelumDiambil = daftarIjazah.filter(
     (item) => item.status === "Belum Diambil"
   ).length;
@@ -1113,7 +1250,17 @@ Terima kasih.`;
             </div>
 
             {daftarIzin.length === 0 ? (
-              <p className="p-8 text-center text-xs text-slate-400">Belum ada permohonan izin dari siswa.</p>
+              <div className="p-8 text-center">
+                <p className="text-xs text-slate-400">
+                  Belum ada permohonan izin dari siswa.
+                </p>
+                <button
+                  onClick={handlePulihkanDataContoh}
+                  className="mt-3 text-[11px] font-semibold text-blue-600 hover:underline"
+                >
+                  Pulihkan Data Contoh
+                </button>
+              </div>
             ) : (
               <div className="overflow-x-auto">
                 <table className="w-full text-left text-xs">
