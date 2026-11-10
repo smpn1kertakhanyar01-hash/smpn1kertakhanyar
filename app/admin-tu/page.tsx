@@ -8,7 +8,7 @@ import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
-import { kirimNotifikasiPersetujuanIzin } from "@/lib/izin-notifikasi";
+import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
   ambilDaftarIzinLengkap,
   berlanggananPerubahanIzin,
@@ -121,13 +121,19 @@ export default function AdminTuPage() {
       );
 
       if (statusBaru === "Disetujui") {
-        // Gunakan info notifikasi (template pesan + tautan wa.me + penanda
-        // nomor dummy) yang disusun handler approval di server.
-        const notifikasi = await kirimNotifikasiPersetujuanIzin(
+        // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
+        // di backend. Tampilkan sukses bila gateway berhasil; fallback hanya
+        // muncul ketika pengiriman otomatis gagal.
+        const notifikasi = susunHasilNotifikasiIzin(
           izinTerbaru,
           hasil.notifikasiWa
         );
-        if (!notifikasi.terkirim) {
+
+        if (notifikasi.terkirim) {
+          alert(
+            "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
+          );
+        } else {
           setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
         }
       }

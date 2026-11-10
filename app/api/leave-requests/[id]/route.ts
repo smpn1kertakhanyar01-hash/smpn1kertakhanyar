@@ -5,10 +5,10 @@ import type { InfoNotifikasiWaServer } from "@/lib/izin-notifikasi";
 import { perbaruiSuratIzinMemori } from "@/lib/memory-store";
 import type { SuratIzinItem } from "@/lib/types";
 import {
-  apakahNomorDummyIzin,
   buatPesanPersetujuanIzin,
   buatUrlWhatsAppDenganPesan,
 } from "@/lib/utils";
+import { kirimPesanWhatsApp } from "@/lib/wa-fonnte";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -84,11 +84,10 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    // Handler approval juga memeriksa nomor WhatsApp tujuan. Nomor dummy
-    // (0812563225xx) tidak dikirim ke Fonnte; sebagai gantinya respons
-    // menyertakan template pesan resmi plus tautan WhatsApp Web
-    // (https://wa.me/{nomor}?text=...) agar guru/petugas dapat mengirim
-    // notifikasi secara manual jika kuota Fonnte habis.
+    // Handler approval selalu berusaha mengirim notifikasi WhatsApp secara
+    // otomatis melalui Fonnte di backend. Nomor berformat 0812563225xx tetap
+    // diproses (tidak diblokir); jika gateway gagal/token belum diatur,
+    // respons menyertakan tautan WhatsApp Web sebagai fallback manual.
     let notifikasiWa: InfoNotifikasiWaServer | undefined;
     if (status.toLowerCase() === "disetujui") {
       const nomorWali = hasil.noTeleponWali?.trim() ?? "";
@@ -97,19 +96,24 @@ export async function PATCH(request: Request, context: RouteContext) {
         jenis: hasil.jenis,
         tanggal: hasil.tanggal,
       });
-      const nomorDummy = apakahNomorDummyIzin(nomorWali);
+
+      const pengiriman = await kirimPesanWhatsApp({
+        nomorTujuan: nomorWali,
+        pesan: pesanWa,
+      });
 
       notifikasiWa = {
         nomor: nomorWali,
         pesan: pesanWa,
         waUrl: nomorWali ? buatUrlWhatsAppDenganPesan(nomorWali, pesanWa) : "",
-        dummy: nomorDummy,
-        ...(nomorDummy
-          ? {
+        terkirim: pengiriman.ok,
+        ...(pengiriman.ok
+          ? {}
+          : {
               alasan:
-                "Nomor wali terdeteksi sebagai nomor dummy (0812563225xx). Gunakan tautan WhatsApp Web untuk mengirim pesan secara manual.",
-            }
-          : {}),
+                pengiriman.error ||
+                "Notifikasi WhatsApp otomatis gagal dikirim. Gunakan WhatsApp Web untuk mengirim pesan secara manual.",
+            }),
       };
     }
 

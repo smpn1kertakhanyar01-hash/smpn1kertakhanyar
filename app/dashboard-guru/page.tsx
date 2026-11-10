@@ -10,7 +10,7 @@ import NotifikasiWhatsAppFallback, {
 import { api } from "@/lib/api-client";
 import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH, KELAS_UTAMA } from "@/lib/constants";
 import { daftarAkunSandiSiswaFallback } from "@/lib/data";
-import { kirimNotifikasiPersetujuanIzin } from "@/lib/izin-notifikasi";
+import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
   ambilDaftarIzinLengkap,
   berlanggananPerubahanIzin,
@@ -36,7 +36,6 @@ import type {
   SuratIzinItem,
 } from "@/lib/types";
 import {
-  apakahNomorDummyIzin,
   buatUrlWhatsApp,
   buatUrlWhatsAppDenganPesan,
 } from "@/lib/utils";
@@ -360,16 +359,16 @@ export default function DashboardGuruPage() {
       );
 
       if (statusBaru === "Disetujui") {
-        // Gunakan info notifikasi (template pesan + tautan wa.me + penanda
-        // nomor dummy) yang disusun handler approval di server.
-        const notifikasi = await kirimNotifikasiPersetujuanIzin(
+        // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
+        // di backend. Klien hanya menampilkan hasilnya.
+        const notifikasi = susunHasilNotifikasiIzin(
           izinTerbaru,
           hasil.notifikasiWa
         );
 
         if (notifikasi.terkirim) {
-          setNotifikasiSukses(
-            `Surat izin ${izinTerbaru.nama} disetujui dan notifikasi WhatsApp terkirim.`
+          alert(
+            "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
           );
         } else {
           setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
@@ -390,23 +389,7 @@ Terima kasih.`;
 
         const nomorWali = izinTerbaru.noTeleponWali;
 
-        if (nomorWali && apakahNomorDummyIzin(nomorWali)) {
-          // Nomor dummy tidak perlu menghabiskan kuota Fonnte; tampilkan
-          // langsung tautan WhatsApp Web sebagai fallback.
-          setFallbackWa({
-            terkirim: false,
-            dummy: true,
-            waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
-            pesan,
-            nomor: nomorWali,
-            nama: izinTerbaru.nama,
-            alasan:
-              "Nomor wali terdeteksi sebagai nomor dummy. Gunakan tombol WhatsApp Web untuk mengirim pesan secara manual.",
-          });
-          setNotifikasiSukses(
-            `Surat izin ${izinTerbaru.nama} ditolak. Notifikasi WA dapat dikirim manual.`
-          );
-        } else if (nomorWali) {
+        if (nomorWali) {
           try {
             const response = await fetch("/api/notifikasi-wa", {
               method: "POST",
@@ -427,7 +410,6 @@ Terima kasih.`;
             if (!response.ok || data.ok === false) {
               setFallbackWa({
                 terkirim: false,
-                dummy: false,
                 waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
                 pesan,
                 nomor: nomorWali,
@@ -451,7 +433,6 @@ Terima kasih.`;
             );
             setFallbackWa({
               terkirim: false,
-              dummy: false,
               waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
               pesan,
               nomor: nomorWali,
