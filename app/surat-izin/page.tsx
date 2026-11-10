@@ -6,7 +6,10 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { api } from "@/lib/api-client";
 import { KELAS_PENDAFTARAN } from "@/lib/constants";
-import { simpanPengajuanIzinBaru } from "@/lib/izin-store";
+import {
+  buatKodeIzinBaru,
+  simpanPengajuanIzinBaru,
+} from "@/lib/izin-store";
 import {
   bacaSesiSiswa,
   hapusSesiSiswa,
@@ -125,29 +128,19 @@ export default function SuratIzinSiswaPage() {
         tandaTanganWali: formData.tandaTanganWali,
       };
 
-      let idIzin: number | undefined;
-      try {
-        const tersimpan = await api.createLeaveRequest(payload);
-        idIzin = tersimpan?.id;
-      } catch (error) {
-        // Backend serverless dapat menolak/tidak menyimpan data. Pengajuan
-        // tetap disimpan di browser agar dashboard guru/TU dan status siswa
-        // tidak kosong.
-        console.error("Gagal mengirim pengajuan ke server:", error);
-      }
-
-      const idAkhir = Number(idIzin) || Date.now();
-      const noReg = `IZN-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${String(idAkhir).padStart(6,"0")}`;
+      // Buat ID tiket dan simpan pengajuan ke localStorage lebih dulu agar
+      // langsung muncul di Dashboard Guru/TU dan /status-izin tanpa menunggu
+      // serverless Vercel (yang bersifat sementara/read-only).
+      const idLokal = Date.now();
+      const noReg = buatKodeIzinBaru();
 
       const dataIzinBaru: SuratIzinItem = {
         ...payload,
-        id: idAkhir,
+        id: idLokal,
         kodeBerkas: noReg,
         status: "MENUNGGU",
       };
 
-      // Persistent client-side: simpan di baris paling atas agar langsung
-      // terbaca Dashboard Guru, Dashboard TU, dan /status-izin.
       simpanPengajuanIzinBaru(dataIzinBaru);
 
       // Pastikan identitas siswa tetap tersedia untuk halaman status izin.
@@ -155,8 +148,16 @@ export default function SuratIzinSiswaPage() {
       localStorage.setItem(STORAGE_KEYS.namaSiswa, formData.namaLengkap);
       localStorage.setItem(STORAGE_KEYS.kelasSiswa, formData.kelas);
 
-      setSubmittedData({ id: idAkhir, noReg });
+      setSubmittedData({ id: idLokal, noReg });
       setIsSubmitted(true);
+
+      // Kirim salinan ke API sebagai cadangan; kegagalan server tidak boleh
+      // membatalkan pengajuan yang sudah tersimpan di browser.
+      try {
+        await api.createLeaveRequest(payload);
+      } catch (error) {
+        console.error("Gagal mengirim salinan pengajuan ke server:", error);
+      }
     } catch (err) {
       console.error(err);
       alert("Gagal mengirim pengajuan surat izin. Silakan coba lagi.");

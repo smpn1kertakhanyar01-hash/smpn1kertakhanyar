@@ -6,6 +6,10 @@ import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
 import {
+  ambilJurnalLengkap,
+  berlanggananPerubahanJurnal,
+} from "@/lib/jurnal-store";
+import {
   hapusSesiSiswa,
   STORAGE_KEYS,
 } from "@/lib/storage";
@@ -34,20 +38,28 @@ export default function JurnalSiswaPage() {
     setIsAuthorized(true);
 
     let masihAktif = true;
+
+    // Tampilkan jurnal dari localStorage lebih dulu agar catatan yang baru
+    // disimpan guru langsung muncul tanpa menunggu API.
+    setDaftarKejadian(ambilJurnalLengkap());
+    setLoading(false);
+
     api
       .getIncidents()
       .then((data) => {
-        if (masihAktif) setDaftarKejadian(data);
+        if (masihAktif) setDaftarKejadian(ambilJurnalLengkap(data));
       })
       .catch((error) => {
         console.error("Gagal memuat jurnal kejadian:", error);
-      })
-      .finally(() => {
-        if (masihAktif) setLoading(false);
       });
+
+    const berhenti = berlanggananPerubahanJurnal(() => {
+      if (masihAktif) setDaftarKejadian(ambilJurnalLengkap());
+    });
 
     return () => {
       masihAktif = false;
+      berhenti();
     };
   }, [router]);
 

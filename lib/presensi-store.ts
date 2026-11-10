@@ -1,14 +1,15 @@
+import { getStore, setStore, subscribeStore } from "./client-store";
 import { daftarSiswaFallback, normalisasiKelasSiswa } from "./data";
 import { STATUS_PRESENSI } from "./constants";
 import type { CatatanAbsen, StatusPresensi } from "./types";
 
 /**
- * Penyimpanan presensi bersama untuk halaman input (`/presensi`) dan rekap
- * (`/rekap-presensi`).
+ * Penyimpanan presensi bersama untuk halaman input (`/presensi`), rekap
+ * (`/rekap-presensi`), dan dashboard guru.
  *
- * API serverless dapat kehilangan data saat instance berganti. Lapisan
- * localStorage ini memastikan presensi yang baru disimpan guru langsung
- * terbaca di halaman rekap pada browser yang sama.
+ * `sekolah_presensi_data` adalah Single Source of Truth di browser sehingga
+ * input guru langsung terbaca di seluruh halaman tanpa bergantung pada SQLite
+ * Vercel yang bersifat read-only.
  */
 
 export const PRESENSI_STORAGE_KEY = "sekolah_presensi_data";
@@ -44,33 +45,16 @@ function normalkanCatatan(
 
 /** Baca seluruh rekap presensi yang tersimpan di browser. */
 export function bacaPresensiLokal(): CatatanAbsen[] {
-  if (typeof window === "undefined") return [];
+  const mentah = getStore<unknown>(PRESENSI_STORAGE_KEY, []);
+  if (!Array.isArray(mentah)) return [];
 
-  try {
-    const mentah = window.localStorage.getItem(PRESENSI_STORAGE_KEY);
-    if (!mentah) return [];
-
-    const hasil = JSON.parse(mentah) as unknown;
-    if (!Array.isArray(hasil)) return [];
-
-    return hasil
-      .map((item) => normalkanCatatan(item as Partial<CatatanAbsen>))
-      .filter((item): item is CatatanAbsen => item !== null);
-  } catch (error) {
-    console.error("Gagal membaca presensi lokal:", error);
-    return [];
-  }
+  return mentah
+    .map((item) => normalkanCatatan(item as Partial<CatatanAbsen>))
+    .filter((item): item is CatatanAbsen => item !== null);
 }
 
 function tulisPresensiLokal(daftar: CatatanAbsen[]): void {
-  if (typeof window === "undefined") return;
-
-  try {
-    window.localStorage.setItem(PRESENSI_STORAGE_KEY, JSON.stringify(daftar));
-    window.dispatchEvent(new Event(PRESENSI_STORE_EVENT));
-  } catch (error) {
-    console.error("Gagal menyimpan presensi lokal:", error);
-  }
+  setStore(PRESENSI_STORAGE_KEY, daftar);
 }
 
 /**
@@ -107,6 +91,13 @@ export function gabungPresensi(
   });
 
   return Array.from(peta.values());
+}
+
+/** Berlangganan perubahan presensi dari halaman/tab lain. */
+export function berlanggananPerubahanPresensi(
+  callback: () => void
+): () => void {
+  return subscribeStore(PRESENSI_STORAGE_KEY, callback);
 }
 
 /**

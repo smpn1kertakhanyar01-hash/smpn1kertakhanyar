@@ -8,6 +8,7 @@ import {
   ambilDaftarIzinLengkap,
   berlanggananPerubahanIzin,
   normalisasiStatusIzin,
+  storeIzinSudahAda,
 } from "@/lib/izin-store";
 import { bacaSesiSiswa, STORAGE_KEYS } from "@/lib/storage";
 import type { SuratIzinItem } from "@/lib/types";
@@ -145,27 +146,41 @@ export default function StatusIzinPage() {
 
     let masihAktif = true;
 
+    const opsiPemohon = {
+      nisn: sesi.nisn,
+      nama: sesi.nama,
+      sertakanSeed: true,
+    };
+
+    const bacaDariStore = () =>
+      ambilDaftarIzinLengkap([], opsiPemohon);
+
+    // Jika store sudah pernah diinisialisasi (misalnya siswa baru saja
+    // mengirim pengajuan atau guru sudah memutuskan), tampilkan langsung dari
+    // localStorage. Pada kunjungan pertama, tunggu data server agar riwayat
+    // lama tidak hilang saat store pertama kali diisi.
+    const storeSudahAda = storeIzinSudahAda();
+
+    if (storeSudahAda) {
+      setDaftarIzinSiswa(bacaDariStore());
+      setMemuat(false);
+    }
+
     const muatRiwayat = async () => {
       try {
-        // Hanya tampilkan berkas milik siswa yang sedang login berdasarkan NISN.
+        // Salinan server hanya dipakai saat store belum pernah diinisialisasi.
         const data = await api.getLeaveRequests(sesi.nisn);
         if (!masihAktif) return;
         setDaftarIzinSiswa(
-          ambilDaftarIzinLengkap(data, {
-            nisn: sesi.nisn,
-            sertakanSeed: true,
-          })
+          storeSudahAda
+            ? bacaDariStore()
+            : ambilDaftarIzinLengkap(data, opsiPemohon)
         );
       } catch (error) {
         console.error("Gagal memuat status izin:", error);
-        if (!masihAktif) return;
-        // Tetap tampilkan data contoh agar riwayat siswa tidak kosong saat API gagal.
-        setDaftarIzinSiswa(
-          ambilDaftarIzinLengkap([], {
-            nisn: sesi.nisn,
-            sertakanSeed: true,
-          })
-        );
+        if (masihAktif && !storeSudahAda) {
+          setDaftarIzinSiswa(bacaDariStore());
+        }
       } finally {
         if (masihAktif) setMemuat(false);
       }
@@ -175,7 +190,8 @@ export default function StatusIzinPage() {
 
     // Perubahan dari Dashboard Guru/TU langsung terlihat tanpa reload.
     const berhenti = berlanggananPerubahanIzin(() => {
-      void muatRiwayat();
+      if (!masihAktif) return;
+      setDaftarIzinSiswa(bacaDariStore());
     });
 
     return () => {

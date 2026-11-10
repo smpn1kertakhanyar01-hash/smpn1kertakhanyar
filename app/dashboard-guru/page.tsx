@@ -8,7 +8,8 @@ import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
-import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH, KELAS_UTAMA } from "@/lib/constants";
+import { clearStore } from "@/lib/client-store";
+import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH } from "@/lib/constants";
 import { daftarAkunSandiSiswaFallback } from "@/lib/data";
 import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
@@ -18,6 +19,20 @@ import {
   simpanOverrideIzin,
   terapkanOverrideIzin,
 } from "@/lib/izin-store";
+import {
+  ambilJurnalLengkap,
+  berlanggananPerubahanJurnal,
+  buatCatatanKejadian,
+  hapusJurnalLokal,
+  simpanJurnalBaru,
+} from "@/lib/jurnal-store";
+import {
+  PRESENSI_STORAGE_KEY,
+  KELAS_REKAP_PRESENSI,
+  bacaPresensiLokal,
+  berlanggananPerubahanPresensi,
+  gabungPresensi,
+} from "@/lib/presensi-store";
 import {
   apakahLogin,
   bacaPeranPegawai,
@@ -107,6 +122,9 @@ export default function DashboardGuruPage() {
   const [daftarPresensi, setDaftarPresensi] = useState<PresensiItem[]>([]);
   const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
   const [daftarKejadian, setDaftarKejadian] = useState<CatatanKejadianItem[]>([]);
+  // Statistik cadangan hanya dipakai selama data pertama kali dimuat; setelah
+  // itu angka kartu mengikuti isi store agar "Hapus Semua" langsung jadi 0.
+  const [memuatDataUtama, setMemuatDataUtama] = useState(true);
   const [daftarMutasi, setDaftarMutasi] = useState<MutasiSiswa[]>([]);
   const [mutasiTerpilih, setMutasiTerpilih] = useState<MutasiSiswa | null>(null);
   const [nomorSuratMutasi, setNomorSuratMutasi] = useState("");
@@ -207,18 +225,22 @@ export default function DashboardGuruPage() {
 
         if (!masihAktif) return;
 
-        setDaftarPresensi(presensi);
+        setDaftarPresensi(gabungPresensi(presensi, bacaPresensiLokal()));
         setDaftarIzin(ambilDaftarIzinLengkap(izin));
-        setDaftarKejadian(kejadian);
+        setDaftarKejadian(ambilJurnalLengkap(kejadian));
         setPengunjungHariIni(statistik.hariIni);
         setRiwayatKunjungan(statistik.riwayat);
       } catch (error) {
         console.error("Gagal memuat data dashboard:", error);
-        // Tetap tampilkan pengajuan izin yang tersimpan di browser ketika API
+        // Tetap tampilkan data yang tersimpan di browser ketika API
         // serverless tidak dapat dihubungi atau mengembalikan data kosong.
         if (masihAktif) {
+          setDaftarPresensi(gabungPresensi([], bacaPresensiLokal()));
           setDaftarIzin(ambilDaftarIzinLengkap([]));
+          setDaftarKejadian(ambilJurnalLengkap());
         }
+      } finally {
+        if (masihAktif) setMemuatDataUtama(false);
       }
 
       // Menu Administrasi Tata Usaha hanya dimuat untuk Admin TU.
@@ -283,12 +305,25 @@ export default function DashboardGuruPage() {
   useEffect(() => {
     const berhenti = berlanggananPerubahanIzin(() => {
       if (!apakahLogin("guru")) return;
-      api
-        .getLeaveRequests()
-        .then((data) => setDaftarIzin(ambilDaftarIzinLengkap(data)))
-        .catch((error) =>
-          console.error("Gagal menyinkronkan status izin:", error)
-        );
+      setDaftarIzin(ambilDaftarIzinLengkap());
+    });
+    return berhenti;
+  }, []);
+
+  // Sinkronkan presensi yang baru diinput guru dari halaman /presensi.
+  useEffect(() => {
+    const berhenti = berlanggananPerubahanPresensi(() => {
+      if (!apakahLogin("guru")) return;
+      setDaftarPresensi(gabungPresensi([], bacaPresensiLokal()));
+    });
+    return berhenti;
+  }, []);
+
+  // Sinkronkan jurnal kejadian agar catatan baru langsung tampil di riwayat.
+  useEffect(() => {
+    const berhenti = berlanggananPerubahanJurnal(() => {
+      if (!apakahLogin("guru")) return;
+      setDaftarKejadian(ambilJurnalLengkap());
     });
     return berhenti;
   }, []);
@@ -511,8 +546,37 @@ Terima kasih.`;
   const handleSimpanKejadian = async (e: React.FormEvent) => {
     e.preventDefault();
 
+    // Simpan ke localStorage lebih dulu agar catatan langsung muncul di
+    // riwayat, walau serverless Vercel gagal menyimpan ke SQLite.
+    const dataBaru = buatCatatanKejadian({
+      guruPiket: formKejadian.guruPiket || "Guru Piket",
+      kategori: formKejadian.kategori,
+      namaSiswaTerlibat: formKejadian.namaSiswaTerlibat || "-",
+      kelasSiswa: formKejadian.kelasSiswa || "-",
+      deskripsi: formKejadian.deskripsi,
+      tindakanPenanganan: formKejadian.tindakanPenanganan,
+    });
+
+    simpanJurnalBaru(dataBaru);
+    setDaftarKejadian(ambilJurnalLengkap());
+
+    // Reset Form
+    setFormKejadian({
+      guruPiket: formKejadian.guruPiket,
+      kategori: "Kedisiplinan",
+      namaSiswaTerlibat: "",
+      kelasSiswa: "",
+      deskripsi: "",
+      tindakanPenanganan: "",
+    });
+    setTampilFormKejadian(false);
+    setNotifikasiSukses(
+      "Catatan kejadian berhasil disimpan ke buku jurnal."
+    );
+
+    // Kirim salinan ke API sebagai cadangan (tidak memblokir UI).
     try {
-      const dataBaru = await api.createIncident({
+      await api.createIncident({
         guruPiket: formKejadian.guruPiket || "Guru Piket",
         kategori: formKejadian.kategori,
         namaSiswaTerlibat: formKejadian.namaSiswaTerlibat || "-",
@@ -520,59 +584,49 @@ Terima kasih.`;
         deskripsi: formKejadian.deskripsi,
         tindakanPenanganan: formKejadian.tindakanPenanganan,
       });
-
-      setDaftarKejadian((prev) => [dataBaru, ...prev]);
-
-      // Reset Form
-      setFormKejadian({
-        guruPiket: formKejadian.guruPiket,
-        kategori: "Kedisiplinan",
-        namaSiswaTerlibat: "",
-        kelasSiswa: "",
-        deskripsi: "",
-        tindakanPenanganan: "",
-      });
-      setTampilFormKejadian(false);
     } catch (error) {
-      console.error("Gagal menyimpan catatan kejadian:", error);
-      alert("Gagal menyimpan catatan kejadian. Silakan coba lagi.");
+      console.error("Salinan jurnal gagal dikirim ke server:", error);
     }
   };
 
   const handleHapusKejadian = async (id: number) => {
     if (!confirm("Hapus catatan kejadian ini?")) return;
 
+    // Hapus dari store lokal lebih dulu agar riwayat langsung diperbarui.
+    setDaftarKejadian(hapusJurnalLokal(id));
+
     try {
       await api.deleteIncident(id);
-      setDaftarKejadian((prev) => prev.filter((k) => k.id !== id));
     } catch (error) {
-      console.error("Gagal menghapus catatan kejadian:", error);
-      alert("Gagal menghapus catatan kejadian. Silakan coba lagi.");
+      console.error("Gagal menghapus salinan catatan kejadian di server:", error);
     }
   };
 
   const handleResetPresensi = async () => {
     if (!confirm("Hapus seluruh catatan presensi siswa?")) return;
 
+    clearStore(PRESENSI_STORAGE_KEY);
+    setDaftarPresensi([]);
+
     try {
       await api.deleteAllAttendance();
-      setDaftarPresensi([]);
     } catch (error) {
-      console.error("Gagal menghapus presensi:", error);
-      alert("Gagal menghapus data presensi. Silakan coba lagi.");
+      console.error("Gagal menghapus salinan presensi di server:", error);
     }
   };
 
   const handleResetIzin = async () => {
     if (!confirm("Hapus seluruh arsip permohonan surat izin?")) return;
 
+    // Kosongkan store lokal terlebih dahulu agar tabel benar-benar kosong
+    // dan data contoh/server tidak muncul kembali.
+    hapusSemuaOverrideIzin();
+    setDaftarIzin([]);
+
     try {
       await api.deleteAllLeaveRequests();
-      hapusSemuaOverrideIzin();
-      setDaftarIzin([]);
     } catch (error) {
-      console.error("Gagal menghapus surat izin:", error);
-      alert("Gagal menghapus arsip surat izin. Silakan coba lagi.");
+      console.error("Gagal menghapus salinan surat izin di server:", error);
     }
   };
 
@@ -837,14 +891,15 @@ Terima kasih.`;
     pengunjungHariIni > 0
       ? pengunjungHariIni
       : STATISTIK_FALLBACK.pengunjung;
-  const angkaInsiden =
-    daftarKejadian.length > 0
-      ? daftarKejadian.length
-      : STATISTIK_FALLBACK.insiden;
-  const angkaIzinMenunggu =
-    daftarIzin.length > 0 ? izinMenunggu : STATISTIK_FALLBACK.izinMenunggu;
-  const angkaIzinDisetujui =
-    daftarIzin.length > 0 ? izinDisetujui : STATISTIK_FALLBACK.izinDisetujui;
+  const angkaInsiden = memuatDataUtama
+    ? STATISTIK_FALLBACK.insiden
+    : daftarKejadian.length;
+  const angkaIzinMenunggu = memuatDataUtama
+    ? STATISTIK_FALLBACK.izinMenunggu
+    : izinMenunggu;
+  const angkaIzinDisetujui = memuatDataUtama
+    ? STATISTIK_FALLBACK.izinDisetujui
+    : izinDisetujui;
   const ijazahBelumDiambil = daftarIjazah.filter(
     (item) => item.status === "Belum Diambil"
   ).length;
@@ -1175,7 +1230,7 @@ Terima kasih.`;
                   className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-600"
                 >
                   <option value="Semua">Semua Kelas</option>
-                  {KELAS_UTAMA.map((kelas) => (
+                  {KELAS_REKAP_PRESENSI.map((kelas) => (
                     <option key={kelas} value={kelas}>
                       Kelas {kelas}
                     </option>

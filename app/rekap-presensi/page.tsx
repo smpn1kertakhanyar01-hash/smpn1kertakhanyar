@@ -7,6 +7,7 @@ import { api } from "@/lib/api-client";
 import {
   KELAS_REKAP_PRESENSI,
   bacaPresensiLokal,
+  berlanggananPerubahanPresensi,
   buatPresensiFallback,
   gabungPresensi,
 } from "@/lib/presensi-store";
@@ -15,6 +16,7 @@ import { ambilTanggalHariIni } from "@/lib/utils";
 
 export default function RekapPresensiPublikPage() {
   const [daftarPresensi, setDaftarPresensi] = useState<CatatanAbsen[]>([]);
+  const [dariServer, setDariServer] = useState<CatatanAbsen[]>([]);
   const [kelasPilihan, setKelasPilihan] = useState<string>("Semua");
   const [tanggalPilihan, setTanggalPilihan] = useState<string>("");
   const [memuat, setMemuat] = useState(true);
@@ -24,19 +26,15 @@ export default function RekapPresensiPublikPage() {
     setTanggalPilihan(tanggalHariIni);
 
     let masihAktif = true;
-    const presensiLokal = bacaPresensiLokal();
 
     api
       .getAttendance()
       .then((data) => {
-        if (masihAktif) setDaftarPresensi(gabungPresensi(data, presensiLokal));
+        if (masihAktif) setDariServer(data);
       })
       .catch((error) => {
-        console.error("Gagal memuat data presensi:", error);
         // Tetap tampilkan input guru yang tersimpan di browser.
-        if (masihAktif) {
-          setDaftarPresensi(gabungPresensi([], presensiLokal));
-        }
+        console.error("Gagal memuat data presensi server:", error);
       })
       .finally(() => {
         if (masihAktif) setMemuat(false);
@@ -46,6 +44,16 @@ export default function RekapPresensiPublikPage() {
       masihAktif = false;
     };
   }, []);
+
+  // Gabungkan data server dengan localStorage dan ikuti perubahan store agar
+  // input presensi terbaru langsung tampil tanpa reload.
+  useEffect(() => {
+    const muat = () =>
+      setDaftarPresensi(gabungPresensi(dariServer, bacaPresensiLokal()));
+
+    muat();
+    return berlanggananPerubahanPresensi(muat);
+  }, [dariServer]);
 
   // Data untuk tanggal terpilih; fallback dipakai hanya bila API dan
   // localStorage sama-sama tidak memiliki presensi pada tanggal tersebut.

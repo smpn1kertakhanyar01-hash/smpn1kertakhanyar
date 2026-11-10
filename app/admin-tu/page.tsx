@@ -12,6 +12,7 @@ import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
   ambilDaftarIzinLengkap,
   berlanggananPerubahanIzin,
+  hapusSemuaOverrideIzin,
   normalisasiStatusIzin,
   simpanOverrideIzin,
   terapkanOverrideIzin,
@@ -83,12 +84,7 @@ export default function AdminTuPage() {
   useEffect(() => {
     const berhenti = berlanggananPerubahanIzin(() => {
       if (!apakahLogin("guru") || !apakahAdminTu()) return;
-      api
-        .getLeaveRequests()
-        .then((data) => setDaftarIzin(ambilDaftarIzinLengkap(data)))
-        .catch((error) =>
-          console.error("Gagal menyinkronkan status izin:", error)
-        );
+      setDaftarIzin(ambilDaftarIzinLengkap());
     });
     return berhenti;
   }, []);
@@ -196,6 +192,21 @@ export default function AdminTuPage() {
       );
     } finally {
       setMemprosesIzin(null);
+    }
+  };
+
+  const handleResetIzin = async () => {
+    if (!confirm("Hapus seluruh arsip permohonan surat izin?")) return;
+
+    // Kosongkan store lokal lebih dulu agar tabel benar-benar kosong dan
+    // tidak memunculkan data lama kembali.
+    hapusSemuaOverrideIzin();
+    setDaftarIzin([]);
+
+    try {
+      await api.deleteAllLeaveRequests();
+    } catch (error) {
+      console.error("Gagal menghapus salinan surat izin di server:", error);
     }
   };
 
@@ -368,6 +379,15 @@ export default function AdminTuPage() {
               <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
                 Disetujui: {memuat ? "..." : izinDisetujui}
               </span>
+              {daftarIzin.length > 0 && (
+                <button
+                  type="button"
+                  onClick={handleResetIzin}
+                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100"
+                >
+                  Hapus Semua
+                </button>
+              )}
             </div>
           </div>
 

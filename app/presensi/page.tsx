@@ -7,7 +7,7 @@ import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
 import { STATUS_PRESENSI } from "@/lib/constants";
 import { daftarSiswaFallback, normalisasiKelasSiswa } from "@/lib/data";
-import { simpanPresensiLokal } from "@/lib/presensi-store";
+import { bacaPresensiLokal, simpanPresensiLokal } from "@/lib/presensi-store";
 import type { CatatanAbsen, Siswa, StatusPresensi } from "@/lib/types";
 import { ambilTanggalHariIni, ambilWaktuSekarang } from "@/lib/utils";
 
@@ -83,15 +83,23 @@ export default function PresensiKelasPage() {
     [siswaPerKelas, kelasTerpilih]
   );
 
-  // Set status awal Hadir untuk semua siswa di rombel terpilih
+  // Muat status yang sudah tersimpan untuk tanggal & kelas terpilih, lalu
+  // lengkapi siswa lain dengan status "Hadir".
   useEffect(() => {
+    const tersimpan = bacaPresensiLokal().filter(
+      (item) => item.tanggal === tanggal && item.kelas === kelasTerpilih
+    );
+    const petaStatus = new Map(
+      tersimpan.map((item) => [item.nisn, item.status] as const)
+    );
+
     setStatusMap(
       siswaList.reduce<Record<string, StatusPresensi>>((status, siswa) => {
-        status[siswa.nisn] = "Hadir";
+        status[siswa.nisn] = petaStatus.get(siswa.nisn) ?? "Hadir";
         return status;
       }, {})
     );
-  }, [siswaList]);
+  }, [siswaList, tanggal, kelasTerpilih]);
 
   const handleUbahStatus = (nisn: string, status: StatusPresensi) => {
     setStatusMap((prev) => ({
