@@ -214,6 +214,11 @@ export default function DashboardGuruPage() {
         setRiwayatKunjungan(statistik.riwayat);
       } catch (error) {
         console.error("Gagal memuat data dashboard:", error);
+        // Tetap tampilkan pengajuan izin yang tersimpan di browser ketika API
+        // serverless tidak dapat dihubungi atau mengembalikan data kosong.
+        if (masihAktif) {
+          setDaftarIzin(ambilDaftarIzinLengkap([]));
+        }
       }
 
       // Menu Administrasi Tata Usaha hanya dimuat untuk Admin TU.
@@ -347,38 +352,77 @@ export default function DashboardGuruPage() {
         catatan = alasan || "Tidak memenuhi persyaratan";
       }
 
-      const hasil = await api.updateLeaveRequestStatus(id, statusBaru, catatan);
+      // Perbarui state dan localStorage lebih dulu agar keputusan langsung
+      // terlihat di Dashboard TU dan Status Izin Siswa, termasuk untuk
+      // pengajuan baru yang hanya tersimpan di browser (Vercel stateless).
+      const itemSebelumnya = daftarIzin.find((item) => item.id === id);
+      const waktuKeputusan = new Date().toLocaleDateString("id-ID");
+      const izinLokal: SuratIzinItem = {
+        ...(itemSebelumnya ?? {
+          id,
+          nama: "Siswa",
+          nisn: "",
+          kelas: "",
+          jenis: "Izin",
+          tanggal: "-",
+          alasan: "-",
+          status: statusBaru,
+        }),
+        status: statusBaru,
+        diverifikasiOleh: namaPegawai,
+        ...(statusBaru === "Disetujui"
+          ? {
+              disetujuiOleh: namaPegawai,
+              tanggalPersetujuan: waktuKeputusan,
+            }
+          : {}),
+        ...(catatan ? { catatanPenolakan: catatan } : {}),
+      };
 
-      // Simpan lebih dulu agar Dashboard TU dan Status Izin Siswa langsung
-      // membaca status yang sama tanpa menunggu reload. Baru setelah itu
-      // terapkan override supaya status terbaru tidak tertimpa keputusan lama.
-      simpanOverrideIzin(hasil);
-      const izinTerbaru = terapkanOverrideIzin(hasil);
+      simpanOverrideIzin(izinLokal);
+      const izinLokalTerbaru = terapkanOverrideIzin(izinLokal);
       setDaftarIzin((prev) =>
-        prev.map((item) => (item.id === id ? izinTerbaru : item))
+        prev.map((item) => (item.id === id ? izinLokalTerbaru : item))
       );
 
-      if (statusBaru === "Disetujui") {
-        // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
-        // di backend. Klien hanya menampilkan hasilnya.
-        const notifikasi = susunHasilNotifikasiIzin(
-          izinTerbaru,
-          hasil.notifikasiWa
+      try {
+        const hasil = await api.updateLeaveRequestStatus(
+          id,
+          statusBaru,
+          catatan
         );
 
-        if (notifikasi.terkirim) {
-          alert(
-            "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
+        simpanOverrideIzin(hasil);
+        const izinTerbaru = terapkanOverrideIzin({
+          ...izinLokalTerbaru,
+          ...hasil,
+          status: hasil.status ?? statusBaru,
+        });
+        setDaftarIzin((prev) =>
+          prev.map((item) => (item.id === id ? izinTerbaru : item))
+        );
+
+        if (statusBaru === "Disetujui") {
+          // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
+          // di backend. Klien hanya menampilkan hasilnya.
+          const notifikasi = susunHasilNotifikasiIzin(
+            izinTerbaru,
+            hasil.notifikasiWa
           );
-        } else {
-          setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
-          setNotifikasiSukses(
-            `Surat izin ${izinTerbaru.nama} disetujui. Notifikasi WA dapat dikirim manual.`
-          );
-        }
-      } else if (statusBaru === "Ditolak") {
-        const noReg = `IZN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(izinTerbaru.id).padStart(6, "0")}`;
-        const pesan = `Yth. Bapak/Ibu ${izinTerbaru.namaWali || ""},
+
+          if (notifikasi.terkirim) {
+            alert(
+              "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
+            );
+          } else {
+            setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
+            setNotifikasiSukses(
+              `Surat izin ${izinTerbaru.nama} disetujui. Notifikasi WA dapat dikirim manual.`
+            );
+          }
+        } else if (statusBaru === "Ditolak") {
+          const noReg = `IZN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(izinTerbaru.id).padStart(6, "0")}`;
+          const pesan = `Yth. Bapak/Ibu ${izinTerbaru.namaWali || ""},
 Permohonan izin untuk siswa: ${izinTerbaru.nama} (Kelas ${izinTerbaru.kelas}) dengan No. Registrasi: ${noReg} DITOLAK oleh ${izinTerbaru.diverifikasiOleh || "petugas sekolah"}.
 
 Alasan Penolakan: ${catatan || "-"}
@@ -387,27 +431,50 @@ Silakan mengajukan kembali dengan kelengkapan berkas yang sesuai atau hubungi pi
 
 Terima kasih.`;
 
-        const nomorWali = izinTerbaru.noTeleponWali;
+          const nomorWali = izinTerbaru.noTeleponWali;
 
-        if (nomorWali) {
-          try {
-            const response = await fetch("/api/notifikasi-wa", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                nomorWa: nomorWali,
-                namaSiswa: izinTerbaru.nama,
-                kelas: izinTerbaru.kelas,
-                noReg,
-                pesan,
-              }),
-            });
-            const data = (await response.json().catch(() => ({}))) as {
-              ok?: boolean;
-              error?: string;
-            };
+          if (nomorWali) {
+            try {
+              const response = await fetch("/api/notifikasi-wa", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                  nomorWa: nomorWali,
+                  namaSiswa: izinTerbaru.nama,
+                  kelas: izinTerbaru.kelas,
+                  noReg,
+                  pesan,
+                }),
+              });
+              const data = (await response.json().catch(() => ({}))) as {
+                ok?: boolean;
+                error?: string;
+              };
 
-            if (!response.ok || data.ok === false) {
+              if (!response.ok || data.ok === false) {
+                setFallbackWa({
+                  terkirim: false,
+                  waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
+                  pesan,
+                  nomor: nomorWali,
+                  nama: izinTerbaru.nama,
+                  alasan:
+                    data.error ||
+                    "Notifikasi penolakan gagal dikirim otomatis. Gunakan WhatsApp Web untuk mengirim manual.",
+                });
+                setNotifikasiSukses(
+                  `Surat izin ${izinTerbaru.nama} ditolak. Notifikasi WA dapat dikirim manual.`
+                );
+              } else {
+                setNotifikasiSukses(
+                  `Surat izin ${izinTerbaru.nama} ditolak dan notifikasi penolakan telah dikirim.`
+                );
+              }
+            } catch (waErr) {
+              console.error(
+                "Gagal mengirim notifikasi WA saat penolakan:",
+                waErr
+              );
               setFallbackWa({
                 terkirim: false,
                 waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
@@ -415,34 +482,24 @@ Terima kasih.`;
                 nomor: nomorWali,
                 nama: izinTerbaru.nama,
                 alasan:
-                  data.error ||
                   "Notifikasi penolakan gagal dikirim otomatis. Gunakan WhatsApp Web untuk mengirim manual.",
               });
-              setNotifikasiSukses(
-                `Surat izin ${izinTerbaru.nama} ditolak. Notifikasi WA dapat dikirim manual.`
-              );
-            } else {
-              setNotifikasiSukses(
-                `Surat izin ${izinTerbaru.nama} ditolak dan notifikasi penolakan telah dikirim.`
-              );
             }
-          } catch (waErr) {
-            console.error(
-              "Gagal mengirim notifikasi WA saat penolakan:",
-              waErr
-            );
-            setFallbackWa({
-              terkirim: false,
-              waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
-              pesan,
-              nomor: nomorWali,
-              nama: izinTerbaru.nama,
-              alasan:
-                "Notifikasi penolakan gagal dikirim otomatis. Gunakan WhatsApp Web untuk mengirim manual.",
-            });
+          } else {
+            setNotifikasiSukses(`Surat izin ${izinTerbaru.nama} ditolak.`);
           }
-        } else {
-          setNotifikasiSukses(`Surat izin ${izinTerbaru.nama} ditolak.`);
+        }
+      } catch (error) {
+        // Keputusan tetap tersimpan lokal sehingga dashboard dan status siswa
+        // tidak kembali ke kondisi semula saat server tidak dapat dihubungi.
+        console.error("Gagal menyinkronkan keputusan izin ke server:", error);
+        setNotifikasiSukses(
+          `Status izin ${izinLokalTerbaru.nama} diperbarui di perangkat ini.`
+        );
+
+        if (statusBaru === "Disetujui") {
+          const notifikasi = susunHasilNotifikasiIzin(izinLokalTerbaru);
+          setFallbackWa({ ...notifikasi, nama: izinLokalTerbaru.nama });
         }
       }
     } catch (error) {

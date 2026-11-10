@@ -14,6 +14,9 @@ import type { SuratIzinItem } from "./types";
 export const IZIN_STORE_EVENT = "smpn1:izin-store-berubah";
 const IZIN_STORAGE_KEY = "smpn1_izin_status_overrides_v1";
 
+/** Kunci localStorage untuk pengajuan izin baru dari formulir siswa. */
+export const PENGAJUAN_IZIN_STORAGE_KEY = "sekolah_pengajuan_izin";
+
 export type StatusIzin = "MENUNGGU" | "DISETUJUI" | "DITOLAK";
 
 export interface OverrideStatusIzin {
@@ -83,6 +86,155 @@ function tulisPetaOverride(peta: PetaOverride): void {
   }
 }
 
+function normalkanPengajuanIzin(item: unknown): SuratIzinItem | null {
+  if (!item || typeof item !== "object") return null;
+
+  const data = item as Partial<SuratIzinItem>;
+  if (data.id === undefined || data.id === null) return null;
+
+  return {
+    id: Number(data.id),
+    kodeBerkas: data.kodeBerkas ? String(data.kodeBerkas) : undefined,
+    nama: String(data.nama ?? "-"),
+    nisn: String(data.nisn ?? ""),
+    kelas: String(data.kelas ?? ""),
+    jenis: String(data.jenis ?? "Izin"),
+    tanggal: String(data.tanggal ?? "-"),
+    alasan: String(data.alasan ?? "-"),
+    status: String(data.status ?? "MENUNGGU"),
+    fotoBukti: data.fotoBukti ? String(data.fotoBukti) : undefined,
+    namaWali: data.namaWali ? String(data.namaWali) : undefined,
+    noTeleponWali: data.noTeleponWali
+      ? String(data.noTeleponWali)
+      : undefined,
+    tandaTanganWali: data.tandaTanganWali
+      ? String(data.tandaTanganWali)
+      : undefined,
+    diverifikasiOleh: data.diverifikasiOleh
+      ? String(data.diverifikasiOleh)
+      : undefined,
+    disetujuiOleh: data.disetujuiOleh ? String(data.disetujuiOleh) : undefined,
+    tanggalPersetujuan: data.tanggalPersetujuan
+      ? String(data.tanggalPersetujuan)
+      : undefined,
+    catatanPenolakan: data.catatanPenolakan
+      ? String(data.catatanPenolakan)
+      : undefined,
+  };
+}
+
+/** Baca pengajuan izin baru yang disimpan di browser siswa. */
+export function bacaPengajuanIzinLokal(): SuratIzinItem[] {
+  if (typeof window === "undefined") return [];
+
+  try {
+    const mentah = window.localStorage.getItem(PENGAJUAN_IZIN_STORAGE_KEY);
+    if (!mentah) return [];
+
+    const hasil = JSON.parse(mentah) as unknown;
+    if (!Array.isArray(hasil)) return [];
+
+    return hasil
+      .map(normalkanPengajuanIzin)
+      .filter((item): item is SuratIzinItem => item !== null);
+  } catch (error) {
+    console.error("Gagal membaca pengajuan izin lokal:", error);
+    return [];
+  }
+}
+
+function tulisPengajuanIzinLokal(
+  daftar: SuratIzinItem[],
+  beriTahu = true
+): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(
+      PENGAJUAN_IZIN_STORAGE_KEY,
+      JSON.stringify(daftar)
+    );
+    if (beriTahu) window.dispatchEvent(new Event(IZIN_STORE_EVENT));
+  } catch (error) {
+    console.error("Gagal menyimpan pengajuan izin lokal:", error);
+
+    // Foto/tanda tangan base64 dapat melebihi kuota localStorage. Simpan
+    // data utama tanpa lampiran agar pengajuan tetap muncul di dashboard.
+    try {
+      const ringkas = daftar.map((item) => ({
+        ...item,
+        fotoBukti: undefined,
+        tandaTanganWali: undefined,
+      }));
+      window.localStorage.setItem(
+        PENGAJUAN_IZIN_STORAGE_KEY,
+        JSON.stringify(ringkas)
+      );
+      if (beriTahu) window.dispatchEvent(new Event(IZIN_STORE_EVENT));
+    } catch (errorKedua) {
+      console.error(
+        "Gagal menyimpan pengajuan izin lokal tanpa lampiran:",
+        errorKedua
+      );
+    }
+  }
+}
+
+/**
+ * Simpan pengajuan izin baru di baris paling atas. Entri dengan id atau kode
+ * berkas yang sama diganti agar tidak muncul ganda.
+ */
+export function simpanPengajuanIzinBaru(item: SuratIzinItem): void {
+  if (typeof window === "undefined") return;
+
+  const tanpaDuplikat = bacaPengajuanIzinLokal().filter(
+    (lokal) =>
+      String(lokal.id) !== String(item.id) &&
+      !(
+        item.kodeBerkas &&
+        lokal.kodeBerkas &&
+        lokal.kodeBerkas === item.kodeBerkas
+      )
+  );
+
+  tulisPengajuanIzinLokal([item, ...tanpaDuplikat]);
+}
+
+/** Samakan status pengajuan lokal saat guru/TU menyetujui atau menolak. */
+function sinkronkanStatusPengajuanLokal(
+  item: SuratIzinItem,
+  beriTahu: boolean
+): void {
+  const daftar = bacaPengajuanIzinLokal();
+  let berubah = false;
+
+  const diperbarui = daftar.map((lokal) => {
+    const cocok =
+      String(lokal.id) === String(item.id) ||
+      Boolean(
+        item.kodeBerkas &&
+          lokal.kodeBerkas &&
+          lokal.kodeBerkas === item.kodeBerkas
+      );
+    if (!cocok) return lokal;
+
+    berubah = true;
+    return {
+      ...lokal,
+      status: normalisasiStatusIzin(item.status),
+      diverifikasiOleh:
+        item.diverifikasiOleh ?? lokal.diverifikasiOleh,
+      disetujuiOleh: item.disetujuiOleh ?? lokal.disetujuiOleh,
+      tanggalPersetujuan:
+        item.tanggalPersetujuan ?? lokal.tanggalPersetujuan,
+      catatanPenolakan:
+        item.catatanPenolakan ?? lokal.catatanPenolakan,
+    };
+  });
+
+  if (berubah) tulisPengajuanIzinLokal(diperbarui, beriTahu);
+}
+
 function cariOverride(
   item: Pick<SuratIzinItem, "id" | "kodeBerkas">,
   peta = bacaPetaOverride()
@@ -138,6 +290,11 @@ export function simpanOverrideIzin(item: SuratIzinItem): void {
     catatanPenolakan: item.catatanPenolakan,
     diperbaruiPada: new Date().toISOString(),
   };
+
+  // Perbarui juga pengajuan asli di localStorage agar Status Izin Siswa
+  // langsung membaca keputusan terbaru. Event perubahan dikirim sekali oleh
+  // tulisPetaOverride di bawah.
+  sinkronkanStatusPengajuanLokal(item, false);
   tulisPetaOverride(peta);
 }
 
@@ -188,10 +345,16 @@ export function ambilDaftarIzinLengkap(
         (item) => !opsi.nisn || item.nisn === opsi.nisn
       )
     : [];
-
-  return gabungTanpaDuplikat(dariServer, seed).map((item) =>
-    terapkanOverrideIzin(item, peta)
+  const pengajuanLokal = bacaPengajuanIzinLokal().filter(
+    (item) => !opsi?.nisn || item.nisn === opsi.nisn
   );
+
+  // Pengajuan baru dari browser siswa diletakkan paling atas, lalu data
+  // server, lalu data contoh. Duplikat berdasarkan id/kode berkas dibuang.
+  return gabungTanpaDuplikat(
+    pengajuanLokal,
+    gabungTanpaDuplikat(dariServer, seed)
+  ).map((item) => terapkanOverrideIzin(item, peta));
 }
 
 /** Cari data contoh milik siswa berdasarkan NISN. */
@@ -209,7 +372,12 @@ export function berlanggananPerubahanIzin(
   if (typeof window === "undefined") return () => {};
 
   const handleStorage = (event: StorageEvent) => {
-    if (event.key === IZIN_STORAGE_KEY) callback();
+    if (
+      event.key === IZIN_STORAGE_KEY ||
+      event.key === PENGAJUAN_IZIN_STORAGE_KEY
+    ) {
+      callback();
+    }
   };
   const handleLokal = () => callback();
 

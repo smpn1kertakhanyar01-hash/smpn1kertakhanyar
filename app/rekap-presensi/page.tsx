@@ -1,10 +1,15 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
-import { KELAS_UTAMA } from "@/lib/constants";
+import {
+  KELAS_REKAP_PRESENSI,
+  bacaPresensiLokal,
+  buatPresensiFallback,
+  gabungPresensi,
+} from "@/lib/presensi-store";
 import type { CatatanAbsen, StatusPresensi } from "@/lib/types";
 import { ambilTanggalHariIni } from "@/lib/utils";
 
@@ -12,18 +17,29 @@ export default function RekapPresensiPublikPage() {
   const [daftarPresensi, setDaftarPresensi] = useState<CatatanAbsen[]>([]);
   const [kelasPilihan, setKelasPilihan] = useState<string>("Semua");
   const [tanggalPilihan, setTanggalPilihan] = useState<string>("");
+  const [memuat, setMemuat] = useState(true);
 
   useEffect(() => {
-    setTanggalPilihan(ambilTanggalHariIni());
+    const tanggalHariIni = ambilTanggalHariIni();
+    setTanggalPilihan(tanggalHariIni);
 
     let masihAktif = true;
+    const presensiLokal = bacaPresensiLokal();
+
     api
       .getAttendance()
       .then((data) => {
-        if (masihAktif) setDaftarPresensi(data);
+        if (masihAktif) setDaftarPresensi(gabungPresensi(data, presensiLokal));
       })
       .catch((error) => {
         console.error("Gagal memuat data presensi:", error);
+        // Tetap tampilkan input guru yang tersimpan di browser.
+        if (masihAktif) {
+          setDaftarPresensi(gabungPresensi([], presensiLokal));
+        }
+      })
+      .finally(() => {
+        if (masihAktif) setMemuat(false);
       });
 
     return () => {
@@ -31,12 +47,42 @@ export default function RekapPresensiPublikPage() {
     };
   }, []);
 
+  // Data untuk tanggal terpilih; fallback dipakai hanya bila API dan
+  // localStorage sama-sama tidak memiliki presensi pada tanggal tersebut.
+  const dataTanggal = useMemo(
+    () =>
+      daftarPresensi.filter(
+        (item) => !tanggalPilihan || item.tanggal === tanggalPilihan
+      ),
+    [daftarPresensi, tanggalPilihan]
+  );
+
+  const memakaiFallback =
+    Boolean(tanggalPilihan) && !memuat && dataTanggal.length === 0;
+
+  const sumberTampil = useMemo(
+    () =>
+      memakaiFallback
+        ? buatPresensiFallback(tanggalPilihan)
+        : daftarPresensi,
+    [memakaiFallback, tanggalPilihan, daftarPresensi]
+  );
+
   // Filter data sesuai kelas & tanggal yang dipilih siswa
-  const hasilFilter = daftarPresensi.filter((item) => {
-    const cocokKelas = kelasPilihan === "Semua" || item.kelas === kelasPilihan;
-    const cocokTanggal = !tanggalPilihan || item.tanggal === tanggalPilihan;
-    return cocokKelas && cocokTanggal;
-  });
+  const hasilFilter = useMemo(() => {
+    return sumberTampil
+      .filter((item) => {
+        const cocokKelas =
+          kelasPilihan === "Semua" || item.kelas === kelasPilihan;
+        const cocokTanggal = !tanggalPilihan || item.tanggal === tanggalPilihan;
+        return cocokKelas && cocokTanggal;
+      })
+      .sort(
+        (a, b) =>
+          a.kelas.localeCompare(b.kelas, "id", { numeric: true }) ||
+          a.nama.localeCompare(b.nama, "id")
+      );
+  }, [sumberTampil, kelasPilihan, tanggalPilihan]);
 
   // Hitung ringkasan status
   const ringkasan = hasilFilter.reduce<Record<StatusPresensi, number>>(
@@ -89,7 +135,7 @@ export default function RekapPresensiPublikPage() {
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
               >
                 <option value="Semua">Semua Kelas</option>
-                {KELAS_UTAMA.map((kelas) => (
+                {KELAS_REKAP_PRESENSI.map((kelas) => (
                   <option key={kelas} value={kelas}>
                     Kelas {kelas}
                   </option>
@@ -133,10 +179,21 @@ export default function RekapPresensiPublikPage() {
             <h2 className="text-xs font-bold text-slate-700 uppercase">
               Rekapitulasi Kehadiran ({hasilFilter.length} Siswa Terdata)
             </h2>
-            <span className="text-[11px] text-slate-400">Mode Lihat (Read-Only)</span>
+            <span className="text-[11px] text-slate-400">
+              {memuat
+                ? "Memuat data..."
+                : memakaiFallback
+                  ? "Data contoh (belum ada input)"
+                  : "Mode Lihat (Read-Only)"}
+            </span>
           </div>
 
-          {hasilFilter.length === 0 ? (
+          {memuat ? (
+            <div className="p-12 text-center text-slate-400 text-xs">
+              <p className="font-semibold text-slate-600 mb-1">Memuat data presensi...</p>
+              <p>Menggabungkan data server dan presensi yang tersimpan di browser.</p>
+            </div>
+          ) : hasilFilter.length === 0 ? (
             <div className="p-12 text-center text-slate-400 text-xs">
               <p className="font-semibold text-slate-600 mb-1">Belum ada data presensi.</p>
               <p>Belum ada presensi yang diinput guru untuk tanggal atau kelas yang dipilih.</p>
@@ -148,9 +205,8 @@ export default function RekapPresensiPublikPage() {
                   <tr>
                     <th className="p-3.5 w-12 text-center">No</th>
                     <th className="p-3.5">Nama Siswa</th>
-                    <th className="p-3.5">Kelas / NISN</th>
-                    <th className="p-3.5">Waktu Input</th>
-                    <th className="p-3.5 text-center">Status</th>
+                    <th className="p-3.5">Kelas</th>
+                    <th className="p-3.5 text-center">Status Kehadiran</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
@@ -161,13 +217,15 @@ export default function RekapPresensiPublikPage() {
                     if (item.status === "Alpa") badgeClass = "bg-rose-50 text-rose-700 border-rose-200";
 
                     return (
-                      <tr key={idx} className="hover:bg-slate-50/70 transition">
+                      <tr key={`${item.nisn}-${item.tanggal}`} className="hover:bg-slate-50/70 transition">
                         <td className="p-3.5 text-center font-bold text-slate-400">{idx + 1}</td>
-                        <td className="p-3.5 font-bold text-slate-900">{item.nama}</td>
-                        <td className="p-3.5 text-slate-500">
-                          {item.kelas} <span className="font-mono text-slate-400">({item.nisn})</span>
+                        <td className="p-3.5">
+                          <span className="font-bold text-slate-900">{item.nama}</span>
+                          <span className="block font-mono text-[11px] text-slate-400">
+                            NISN {item.nisn}
+                          </span>
                         </td>
-                        <td className="p-3.5 text-slate-600 font-mono">{item.jamInput}</td>
+                        <td className="p-3.5 font-semibold text-slate-600">{item.kelas}</td>
                         <td className="p-3.5 text-center">
                           <span className={`px-3 py-1 rounded-full border text-xs font-bold inline-block ${badgeClass}`}>
                             {item.status}

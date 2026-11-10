@@ -65,6 +65,8 @@ export default function AdminTuPage() {
         if (masihAktif) setDaftarIzin(ambilDaftarIzinLengkap(izin));
       } catch (error) {
         console.error("Gagal memuat rekap surat izin:", error);
+        // Tetap tampilkan pengajuan izin baru yang tersimpan di browser.
+        if (masihAktif) setDaftarIzin(ambilDaftarIzinLengkap([]));
       }
 
       if (masihAktif) setMemuat(false);
@@ -111,30 +113,79 @@ export default function AdminTuPage() {
       }
 
       setMemprosesIzin(id);
-      const hasil = await api.updateLeaveRequestStatus(id, statusBaru, catatan);
 
-      // Simpan lebih dulu agar keputusan terbaru tidak tertimpa override lama.
-      simpanOverrideIzin(hasil);
-      const izinTerbaru = terapkanOverrideIzin(hasil);
+      // Update state + localStorage lebih dulu agar keputusan langsung
+      // tercermin di Dashboard Guru dan Status Izin Siswa meskipun data
+      // pengajuan hanya tersimpan di browser (Vercel stateless).
+      const itemSebelumnya = daftarIzin.find((item) => item.id === id);
+      const izinLokal: SuratIzinItem = {
+        ...(itemSebelumnya ?? {
+          id,
+          nama: "Siswa",
+          nisn: "",
+          kelas: "",
+          jenis: "Izin",
+          tanggal: "-",
+          alasan: "-",
+          status: statusBaru,
+        }),
+        status: statusBaru,
+        diverifikasiOleh: nama || "Petugas Tata Usaha",
+        ...(statusBaru === "Disetujui"
+          ? {
+              disetujuiOleh: nama || "Petugas Tata Usaha",
+              tanggalPersetujuan: new Date().toLocaleDateString("id-ID"),
+            }
+          : {}),
+        ...(catatan ? { catatanPenolakan: catatan } : {}),
+      };
+
+      simpanOverrideIzin(izinLokal);
+      const izinLokalTerbaru = terapkanOverrideIzin(izinLokal);
       setDaftarIzin((prev) =>
-        prev.map((item) => (item.id === id ? izinTerbaru : item))
+        prev.map((item) => (item.id === id ? izinLokalTerbaru : item))
       );
 
-      if (statusBaru === "Disetujui") {
-        // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
-        // di backend. Tampilkan sukses bila gateway berhasil; fallback hanya
-        // muncul ketika pengiriman otomatis gagal.
-        const notifikasi = susunHasilNotifikasiIzin(
-          izinTerbaru,
-          hasil.notifikasiWa
+      try {
+        const hasil = await api.updateLeaveRequestStatus(
+          id,
+          statusBaru,
+          catatan
         );
 
-        if (notifikasi.terkirim) {
-          alert(
-            "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
+        simpanOverrideIzin(hasil);
+        const izinTerbaru = terapkanOverrideIzin({
+          ...izinLokalTerbaru,
+          ...hasil,
+          status: hasil.status ?? statusBaru,
+        });
+        setDaftarIzin((prev) =>
+          prev.map((item) => (item.id === id ? izinTerbaru : item))
+        );
+
+        if (statusBaru === "Disetujui") {
+          // Notifikasi WhatsApp sudah dikirim otomatis oleh handler approval
+          // di backend. Tampilkan sukses bila gateway berhasil; fallback hanya
+          // muncul ketika pengiriman otomatis gagal.
+          const notifikasi = susunHasilNotifikasiIzin(
+            izinTerbaru,
+            hasil.notifikasiWa
           );
-        } else {
-          setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
+
+          if (notifikasi.terkirim) {
+            alert(
+              "Surat izin berhasil disetujui dan notifikasi WhatsApp otomatis telah terkirim."
+            );
+          } else {
+            setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
+          }
+        }
+      } catch (error) {
+        // Status lokal tetap dipertahankan walau sinkronisasi server gagal.
+        console.error("Gagal menyinkronkan keputusan izin ke server:", error);
+        if (statusBaru === "Disetujui") {
+          const notifikasi = susunHasilNotifikasiIzin(izinLokalTerbaru);
+          setFallbackWa({ ...notifikasi, nama: izinLokalTerbaru.nama });
         }
       }
     } catch (error) {

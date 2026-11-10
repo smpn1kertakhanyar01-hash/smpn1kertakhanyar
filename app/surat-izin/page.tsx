@@ -6,11 +6,13 @@ import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
 import { api } from "@/lib/api-client";
 import { KELAS_PENDAFTARAN } from "@/lib/constants";
+import { simpanPengajuanIzinBaru } from "@/lib/izin-store";
 import {
   bacaSesiSiswa,
   hapusSesiSiswa,
   STORAGE_KEYS,
 } from "@/lib/storage";
+import type { SuratIzinItem } from "@/lib/types";
 
 export default function SuratIzinSiswaPage() {
   const router = useRouter();
@@ -109,7 +111,7 @@ export default function SuratIzinSiswaPage() {
     }
 
     try {
-      const tersimpan = await api.createLeaveRequest({
+      const payload = {
         nama: formData.namaLengkap,
         nisn: formData.nisn,
         kelas: formData.kelas,
@@ -121,12 +123,39 @@ export default function SuratIzinSiswaPage() {
         namaWali: formData.namaWali,
         noTeleponWali: formData.noTeleponWali,
         tandaTanganWali: formData.tandaTanganWali,
-      } as any);
+      };
 
-      const idIzin = (tersimpan as any)?.id;
-      const noReg = `IZN-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${String(idIzin || Date.now()).padStart(6,"0")}`;
+      let idIzin: number | undefined;
+      try {
+        const tersimpan = await api.createLeaveRequest(payload);
+        idIzin = tersimpan?.id;
+      } catch (error) {
+        // Backend serverless dapat menolak/tidak menyimpan data. Pengajuan
+        // tetap disimpan di browser agar dashboard guru/TU dan status siswa
+        // tidak kosong.
+        console.error("Gagal mengirim pengajuan ke server:", error);
+      }
 
-      setSubmittedData({ id: idIzin, noReg });
+      const idAkhir = Number(idIzin) || Date.now();
+      const noReg = `IZN-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${String(idAkhir).padStart(6,"0")}`;
+
+      const dataIzinBaru: SuratIzinItem = {
+        ...payload,
+        id: idAkhir,
+        kodeBerkas: noReg,
+        status: "MENUNGGU",
+      };
+
+      // Persistent client-side: simpan di baris paling atas agar langsung
+      // terbaca Dashboard Guru, Dashboard TU, dan /status-izin.
+      simpanPengajuanIzinBaru(dataIzinBaru);
+
+      // Pastikan identitas siswa tetap tersedia untuk halaman status izin.
+      localStorage.setItem(STORAGE_KEYS.nisnSiswa, formData.nisn);
+      localStorage.setItem(STORAGE_KEYS.namaSiswa, formData.namaLengkap);
+      localStorage.setItem(STORAGE_KEYS.kelasSiswa, formData.kelas);
+
+      setSubmittedData({ id: idAkhir, noReg });
       setIsSubmitted(true);
     } catch (err) {
       console.error(err);
