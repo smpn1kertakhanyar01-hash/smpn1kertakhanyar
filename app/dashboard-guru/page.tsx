@@ -730,10 +730,10 @@ Terima kasih.`;
   const isAdminTu = peranPegawai === "ADMIN_TU";
 
   const izinMenunggu = daftarIzin.filter((item) =>
-    item.status.includes("Menunggu")
+    item.status.toLowerCase().includes("menunggu")
   ).length;
-  const izinDisetujui = daftarIzin.filter(
-    (item) => item.status === "Disetujui"
+  const izinDisetujui = daftarIzin.filter((item) =>
+    item.status.toLowerCase().includes("setuju")
   ).length;
   const angkaPengunjung =
     pengunjungHariIni > 0
@@ -980,7 +980,10 @@ Terima kasih.`;
                       <tr key={row.id} className="hover:bg-slate-50/70 transition">
                         <td className="p-3">
                           <p className="font-bold text-slate-900">{row.nama}</p>
-                          <p className="text-[10px] text-slate-400">{row.nisn} • {row.kelas}</p>
+                          <p className="text-[10px] text-slate-400">
+                            {row.kodeBerkas ? `${row.kodeBerkas} • ` : ""}
+                            {row.nisn} • {row.kelas}
+                          </p>
                         </td>
                         <td className="p-3">
                           <p className="font-semibold text-slate-800">
@@ -1020,9 +1023,9 @@ Terima kasih.`;
                         <td className="p-3 whitespace-nowrap">
                           <span
                             className={`px-2 py-0.5 rounded text-[10px] font-semibold ${
-                              row.status === "Disetujui"
+                              row.status.toLowerCase() === "disetujui"
                                 ? "bg-emerald-50 text-emerald-700 border border-emerald-100"
-                                : row.status === "Ditolak"
+                                : row.status.toLowerCase() === "ditolak"
                                 ? "bg-rose-50 text-rose-700 border border-rose-100"
                                 : "bg-amber-50 text-amber-700 border border-amber-100"
                             }`}

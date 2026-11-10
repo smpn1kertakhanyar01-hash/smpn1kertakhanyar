@@ -52,6 +52,8 @@ export interface CatatanAbsen {
 
 export interface SuratIzinItem {
   id: number;
+  /** Kode berkas tampilan, mis. IZIN-001 (opsional untuk data lama). */
+  kodeBerkas?: string;
   nama: string;
   nisn: string;
   kelas: string;

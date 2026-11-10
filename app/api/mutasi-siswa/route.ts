@@ -7,7 +7,9 @@ import {
   getSiswaProfileById,
 } from "@/lib/db-kesiswaan";
 import {
+  CONTOH_MUTASI_SISWA,
   daftarMutasiMemori,
+  gabungDenganContoh,
   simpanMutasiMemori,
 } from "@/lib/memory-store";
 import {
@@ -18,6 +20,11 @@ import type { JenisMutasi, MutasiSiswa } from "@/lib/types";
 
 const JENIS_VALID: JenisMutasi[] = ["MASUK", "KELUAR"];
 const POLA_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Vercel menjalankan SQLite read-only sehingga data contoh perlu dilengkapi. */
+function berjalanDiVercel(): boolean {
+  return Boolean(process.env.VERCEL);
+}
 
 /** Basis URL publik untuk tautan verifikasi di pesan WhatsApp. */
 function tentukanBasisUrl(request: Request): string {
@@ -56,16 +63,30 @@ export async function GET(request: Request) {
 
     const dariMemori = daftarMutasiMemori(filter);
 
+    let dariDatabase: MutasiSiswa[] = [];
     try {
-      const dariDatabase = getMutasiSiswa(filter);
-      if (dariDatabase.length > 0) {
-        return NextResponse.json([...dariMemori, ...dariDatabase]);
-      }
+      dariDatabase = getMutasiSiswa(filter);
     } catch (error) {
       console.error("Gagal membaca mutasi siswa dari SQLite:", error);
     }
 
-    return NextResponse.json(dariMemori);
+    const adaFilter =
+      filter.siswaId !== undefined || filter.jenisMutasi !== undefined;
+
+    // Tanpa filter (halaman rekap): sertakan dua contoh mutasi agar kartu
+    // "Mutasi Masuk/Keluar" dan tabel tidak kosong. Di Vercel SQLite read-only
+    // hanya berisi data demo, sehingga baris database tidak digabungkan dan
+    // pengajuan baru tetap tampil lewat memori runtime.
+    if (!adaFilter && (berjalanDiVercel() || dariDatabase.length === 0)) {
+      const sumber = berjalanDiVercel()
+        ? dariMemori
+        : [...dariMemori, ...dariDatabase];
+      return NextResponse.json(
+        gabungDenganContoh(sumber, CONTOH_MUTASI_SISWA)
+      );
+    }
+
+    return NextResponse.json([...dariMemori, ...dariDatabase]);
   } catch (error) {
     console.error("Gagal membaca mutasi siswa:", error);
     return NextResponse.json([]);

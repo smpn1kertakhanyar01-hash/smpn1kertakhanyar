@@ -6,7 +6,12 @@ import {
   siswaTerdaftar,
   updateMutasiSiswa,
 } from "@/lib/db-kesiswaan";
-import type { JenisMutasi } from "@/lib/types";
+import {
+  CONTOH_MUTASI_SISWA,
+  daftarMutasiMemori,
+  perbaruiMutasiMemori,
+} from "@/lib/memory-store";
+import type { JenisMutasi, MutasiSiswa } from "@/lib/types";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -14,6 +19,27 @@ interface RouteContext {
 
 const JENIS_VALID: JenisMutasi[] = ["MASUK", "KELUAR"];
 const POLA_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
+
+/** Cek ketersediaan data di SQLite, memori runtime, atau data contoh. */
+function adaDataMutasi(id: number): boolean {
+  try {
+    if (getMutasiSiswaById(id)) return true;
+  } catch (error) {
+    console.error("Gagal memeriksa mutasi siswa di SQLite:", error);
+  }
+
+  return (
+    daftarMutasiMemori().some((item) => item.id === id) ||
+    CONTOH_MUTASI_SISWA.some((item) => item.id === id)
+  );
+}
+
+/** Jangan menimpa nilai data contoh dengan undefined saat memperbarui memori. */
+function buangNilaiUndefined<T extends object>(nilai: T): Partial<T> {
+  return Object.fromEntries(
+    Object.entries(nilai).filter(([, isi]) => isi !== undefined)
+  ) as Partial<T>;
+}
 
 export async function PATCH(request: Request, context: RouteContext) {
   try {
@@ -33,7 +59,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (!getMutasiSiswaById(nomorId)) {
+    if (!adaDataMutasi(nomorId)) {
       return NextResponse.json(
         { error: "Data mutasi siswa tidak ditemukan." },
         { status: 404 }
@@ -119,7 +145,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const hasil = updateMutasiSiswa(nomorId, {
+    const perubahan = {
       siswaId,
       namaSiswa:
         body.namaSiswa === undefined
@@ -154,7 +180,29 @@ export async function PATCH(request: Request, context: RouteContext) {
           ? undefined
           : body.berkasPendukung || null,
       statusBerkas: body.statusBerkas?.trim() || undefined,
-    });
+    };
+
+    let hasil: MutasiSiswa | null = null;
+    try {
+      hasil = updateMutasiSiswa(nomorId, perubahan);
+    } catch (error) {
+      // SQLite read-only di Vercel: perbarui salinan memori runtime.
+      console.error("Gagal memperbarui mutasi siswa di SQLite:", error);
+    }
+
+    if (!hasil) {
+      hasil = perbaruiMutasiMemori(
+        nomorId,
+        buangNilaiUndefined(perubahan)
+      );
+    }
+
+    if (!hasil) {
+      return NextResponse.json(
+        { error: "Data mutasi siswa tidak ditemukan." },
+        { status: 404 }
+      );
+    }
 
     return NextResponse.json(hasil);
   } catch (error) {
@@ -184,7 +232,15 @@ export async function DELETE(request: Request, context: RouteContext) {
       );
     }
 
-    if (!deleteMutasiSiswa(nomorId)) {
+    let terhapus = false;
+    try {
+      terhapus = deleteMutasiSiswa(nomorId);
+    } catch (error) {
+      // SQLite read-only di Vercel: data memori/contoh tidak dapat dihapus.
+      console.error("Gagal menghapus mutasi siswa di SQLite:", error);
+    }
+
+    if (!terhapus) {
       return NextResponse.json(
         { error: "Data mutasi siswa tidak ditemukan." },
         { status: 404 }

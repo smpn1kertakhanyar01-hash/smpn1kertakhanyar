@@ -112,10 +112,15 @@ export default function AdminTuPage() {
   const totalKeluar = daftarMutasi.filter(
     (item) => item.jenisMutasi === "KELUAR"
   ).length;
-  const belumDiputuskan = daftarMutasi.filter(
-    (item) =>
-      item.statusBerkas !== "Disetujui" && item.statusBerkas !== "Ditolak"
-  ).length;
+  const belumDiputuskan = daftarMutasi.filter((item) => {
+    const status = item.statusBerkas.toLowerCase();
+    return (
+      !status.includes("setuju") &&
+      !status.includes("tolak") &&
+      !status.includes("terima") &&
+      !status.includes("selesai")
+    );
+  }).length;
 
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-800 font-sans pb-16">

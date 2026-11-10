@@ -8,8 +8,19 @@ import {
 import type { CatatanKejadianItem } from "@/lib/types";
 import { ambilTanggalPanjang, ambilWaktuSekarang } from "@/lib/utils";
 
+/** Vercel menjalankan SQLite read-only sehingga data contoh perlu dilengkapi. */
+function berjalanDiVercel(): boolean {
+  return Boolean(process.env.VERCEL);
+}
+
 export async function GET() {
   const dariMemori = daftarInsidenMemori();
+
+  // Di Vercel SQLite read-only hanya berisi data demo, jadi selalu tampilkan
+  // enam contoh insiden agar kartu ringkasan (6 kasus) cocok dengan tabel.
+  if (berjalanDiVercel()) {
+    return NextResponse.json([...dariMemori, ...CONTOH_INSIDEN_SEKOLAH]);
+  }
 
   try {
     const dariDatabase = getIncidents();

@@ -148,8 +148,31 @@ export default function AdminTuMutasiPage() {
       if (filterJenis !== "SEMUA" && item.jenisMutasi !== filterJenis) {
         return false;
       }
-      if (filterStatus !== "SEMUA" && item.statusBerkas !== filterStatus) {
-        return false;
+      if (filterStatus !== "SEMUA") {
+        const status = item.statusBerkas.toLowerCase();
+        if (filterStatus === "Disetujui") {
+          // "Diterima"/"Selesai" adalah status akhir data contoh mutasi.
+          if (
+            !status.includes("setuju") &&
+            !status.includes("terima") &&
+            !status.includes("selesai")
+          ) {
+            return false;
+          }
+        } else if (filterStatus === "Ditolak") {
+          if (!status.includes("tolak")) return false;
+        } else if (filterStatus === "Menunggu Verifikasi") {
+          if (!status.includes("menunggu")) return false;
+        } else if (filterStatus === "Berkas Terverifikasi") {
+          if (
+            !status.includes("verifikasi") ||
+            status.includes("menunggu")
+          ) {
+            return false;
+          }
+        } else if (item.statusBerkas !== filterStatus) {
+          return false;
+        }
       }
       if (!kunci) return true;
 
@@ -163,11 +186,17 @@ export default function AdminTuMutasiPage() {
     () => ({
       masuk: daftar.filter((item) => item.jenisMutasi === "MASUK").length,
       keluar: daftar.filter((item) => item.jenisMutasi === "KELUAR").length,
-      menunggu: daftar.filter(
-        (item) => item.statusBerkas === "Menunggu Verifikasi"
+      menunggu: daftar.filter((item) =>
+        item.statusBerkas.toLowerCase().includes("menunggu")
       ).length,
-      disetujui: daftar.filter((item) => item.statusBerkas === STATUS_DISETUJUI)
-        .length,
+      disetujui: daftar.filter((item) => {
+        const status = item.statusBerkas.toLowerCase();
+        return (
+          status.includes("setuju") ||
+          status.includes("terima") ||
+          status.includes("selesai")
+        );
+      }).length,
     }),
     [daftar]
   );
@@ -448,9 +477,12 @@ export default function AdminTuMutasiPage() {
               const cek = berkasFisik[item.id] ?? BERKAS_FISIK.map(() => false);
               const lengkap = semuaBerkasLengkap(item.id);
               const diproses = memproses === item.id;
+              const statusFinal = item.statusBerkas.toLowerCase();
               const final =
-                item.statusBerkas === STATUS_DISETUJUI ||
-                item.statusBerkas === STATUS_DITOLAK;
+                statusFinal.includes("setuju") ||
+                statusFinal.includes("tolak") ||
+                statusFinal.includes("terima") ||
+                statusFinal.includes("selesai");
               const berkas = item.berkasPendukung;
 
               return (

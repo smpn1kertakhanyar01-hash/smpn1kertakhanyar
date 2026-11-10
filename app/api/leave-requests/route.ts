@@ -5,10 +5,17 @@ import {
   getLeaveRequests,
 } from "@/lib/db";
 import {
+  CONTOH_SURAT_IZIN,
   daftarSuratIzinMemori,
+  gabungDenganContoh,
   simpanSuratIzinMemori,
 } from "@/lib/memory-store";
 import type { SuratIzinItem } from "@/lib/types";
+
+/** Vercel menjalankan SQLite read-only sehingga data contoh perlu dilengkapi. */
+function berjalanDiVercel(): boolean {
+  return Boolean(process.env.VERCEL);
+}
 
 /**
  * Batas panjang string Base64 untuk foto bukti dan tanda tangan.
@@ -28,17 +35,27 @@ export async function GET(request: Request) {
     const nisn = searchParams.get("nisn") ?? undefined;
     const dariMemori = daftarSuratIzinMemori(nisn);
 
+    let dariDatabase: SuratIzinItem[] = [];
     try {
-      const dariDatabase = getLeaveRequests({ nisn });
-      if (dariDatabase.length > 0) {
-        return NextResponse.json([...dariMemori, ...dariDatabase]);
-      }
+      dariDatabase = getLeaveRequests({ nisn });
     } catch (error) {
       console.error("Gagal membaca surat izin dari SQLite:", error);
     }
 
-    // Database kosong/tidak terbaca (Vercel): gunakan data memori runtime.
-    return NextResponse.json(dariMemori);
+    // Dashboard (tanpa filter NISN) selalu menampilkan 21 berkas contoh agar
+    // kartu ringkasan 4 menunggu + 17 disetujui cocok dengan tabel. Di Vercel
+    // SQLite bersifat read-only dan hanya berisi data demo, jadi baris database
+    // tidak digabungkan; pengajuan baru tetap tampil lewat memori runtime.
+    if (!nisn && (berjalanDiVercel() || dariDatabase.length === 0)) {
+      const sumber = berjalanDiVercel()
+        ? dariMemori
+        : [...dariMemori, ...dariDatabase];
+      return NextResponse.json(
+        gabungDenganContoh(sumber, CONTOH_SURAT_IZIN)
+      );
+    }
+
+    return NextResponse.json([...dariMemori, ...dariDatabase]);
   } catch (error) {
     console.error("Gagal membaca surat izin:", error);
     return NextResponse.json([]);
