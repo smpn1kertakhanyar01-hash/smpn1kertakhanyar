@@ -1,8 +1,14 @@
 import { NextResponse } from "next/server";
 import { sesiDariPermintaan } from "@/lib/api-auth";
 import { updateLeaveRequestStatus } from "@/lib/db";
+import type { InfoNotifikasiWaServer } from "@/lib/izin-notifikasi";
 import { perbaruiSuratIzinMemori } from "@/lib/memory-store";
 import type { SuratIzinItem } from "@/lib/types";
+import {
+  apakahNomorDummyIzin,
+  buatPesanPersetujuanIzin,
+  buatUrlWhatsAppDenganPesan,
+} from "@/lib/utils";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -78,7 +84,40 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    return NextResponse.json({ ...hasil, success: true });
+    // Handler approval juga memeriksa nomor WhatsApp tujuan. Nomor dummy
+    // (0812563225xx) tidak dikirim ke Fonnte; sebagai gantinya respons
+    // menyertakan template pesan resmi plus tautan WhatsApp Web
+    // (https://wa.me/{nomor}?text=...) agar guru/petugas dapat mengirim
+    // notifikasi secara manual jika kuota Fonnte habis.
+    let notifikasiWa: InfoNotifikasiWaServer | undefined;
+    if (status.toLowerCase() === "disetujui") {
+      const nomorWali = hasil.noTeleponWali?.trim() ?? "";
+      const pesanWa = buatPesanPersetujuanIzin({
+        nama: hasil.nama,
+        jenis: hasil.jenis,
+        tanggal: hasil.tanggal,
+      });
+      const nomorDummy = apakahNomorDummyIzin(nomorWali);
+
+      notifikasiWa = {
+        nomor: nomorWali,
+        pesan: pesanWa,
+        waUrl: nomorWali ? buatUrlWhatsAppDenganPesan(nomorWali, pesanWa) : "",
+        dummy: nomorDummy,
+        ...(nomorDummy
+          ? {
+              alasan:
+                "Nomor wali terdeteksi sebagai nomor dummy (0812563225xx). Gunakan tautan WhatsApp Web untuk mengirim pesan secara manual.",
+            }
+          : {}),
+      };
+    }
+
+    return NextResponse.json({
+      ...hasil,
+      success: true,
+      ...(notifikasiWa ? { notifikasiWa } : {}),
+    });
   } catch (error) {
     console.error("Gagal memperbarui status izin:", error);
     return NextResponse.json(

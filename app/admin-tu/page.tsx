@@ -4,21 +4,36 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import NotifikasiWhatsAppFallback, {
+  type DataFallbackWhatsApp,
+} from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
+import { kirimNotifikasiPersetujuanIzin } from "@/lib/izin-notifikasi";
+import {
+  ambilDaftarIzinLengkap,
+  berlanggananPerubahanIzin,
+  normalisasiStatusIzin,
+  simpanOverrideIzin,
+  terapkanOverrideIzin,
+} from "@/lib/izin-store";
 import {
   apakahAdminTu,
   apakahLogin,
   bacaNamaGuru,
   hapusSesiGuru,
 } from "@/lib/storage";
-import type { MutasiSiswa } from "@/lib/types";
+import type { MutasiSiswa, SuratIzinItem } from "@/lib/types";
 
 export default function AdminTuPage() {
   const router = useRouter();
   const [siap, setSiap] = useState(false);
   const [nama, setNama] = useState("");
   const [daftarMutasi, setDaftarMutasi] = useState<MutasiSiswa[]>([]);
+  const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
   const [memuat, setMemuat] = useState(true);
+  const [memprosesIzin, setMemprosesIzin] = useState<number | null>(null);
+  const [fallbackWa, setFallbackWa] =
+    useState<DataFallbackWhatsApp | null>(null);
 
   const [sandiLama, setSandiLama] = useState("");
   const [sandiBaru, setSandiBaru] = useState("");
@@ -43,9 +58,16 @@ export default function AdminTuPage() {
         if (masihAktif) setDaftarMutasi(data);
       } catch (error) {
         console.error("Gagal memuat rekap mutasi:", error);
-      } finally {
-        if (masihAktif) setMemuat(false);
       }
+
+      try {
+        const izin = await api.getLeaveRequests();
+        if (masihAktif) setDaftarIzin(ambilDaftarIzinLengkap(izin));
+      } catch (error) {
+        console.error("Gagal memuat rekap surat izin:", error);
+      }
+
+      if (masihAktif) setMemuat(false);
     };
 
     void muatData();
@@ -55,6 +77,20 @@ export default function AdminTuPage() {
     };
   }, [router]);
 
+  // Sinkronkan keputusan izin dengan Dashboard Guru dan portal siswa.
+  useEffect(() => {
+    const berhenti = berlanggananPerubahanIzin(() => {
+      if (!apakahLogin("guru") || !apakahAdminTu()) return;
+      api
+        .getLeaveRequests()
+        .then((data) => setDaftarIzin(ambilDaftarIzinLengkap(data)))
+        .catch((error) =>
+          console.error("Gagal menyinkronkan status izin:", error)
+        );
+    });
+    return berhenti;
+  }, []);
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -63,6 +99,47 @@ export default function AdminTuPage() {
     }
     hapusSesiGuru();
     router.replace("/login-guru");
+  };
+
+  const handleUpdateStatusIzin = async (id: number, statusBaru: string) => {
+    try {
+      let catatan: string | undefined;
+      if (statusBaru === "Ditolak") {
+        const alasan = prompt("Masukkan alasan penolakan surat izin:");
+        if (alasan === null) return;
+        catatan = alasan || "Tidak memenuhi persyaratan";
+      }
+
+      setMemprosesIzin(id);
+      const hasil = await api.updateLeaveRequestStatus(id, statusBaru, catatan);
+
+      // Simpan lebih dulu agar keputusan terbaru tidak tertimpa override lama.
+      simpanOverrideIzin(hasil);
+      const izinTerbaru = terapkanOverrideIzin(hasil);
+      setDaftarIzin((prev) =>
+        prev.map((item) => (item.id === id ? izinTerbaru : item))
+      );
+
+      if (statusBaru === "Disetujui") {
+        // Gunakan info notifikasi (template pesan + tautan wa.me + penanda
+        // nomor dummy) yang disusun handler approval di server.
+        const notifikasi = await kirimNotifikasiPersetujuanIzin(
+          izinTerbaru,
+          hasil.notifikasiWa
+        );
+        if (!notifikasi.terkirim) {
+          setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
+        }
+      }
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Gagal memperbarui status pengajuan izin."
+      );
+    } finally {
+      setMemprosesIzin(null);
+    }
   };
 
   const handleGantiSandi = async (e: React.FormEvent<HTMLFormElement>) => {
@@ -121,6 +198,13 @@ export default function AdminTuPage() {
       !status.includes("selesai")
     );
   }).length;
+
+  const izinMenunggu = daftarIzin.filter(
+    (item) => normalisasiStatusIzin(item.status) === "MENUNGGU"
+  ).length;
+  const izinDisetujui = daftarIzin.filter(
+    (item) => normalisasiStatusIzin(item.status) === "DISETUJUI"
+  ).length;
 
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-800 font-sans pb-16">
@@ -208,6 +292,134 @@ export default function AdminTuPage() {
             </h3>
           </div>
         </div>
+
+        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Verifikasi Surat Izin Siswa
+              </h2>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Keputusan Tata Usaha langsung tersinkron ke Dashboard Guru dan
+                halaman Status Izin Siswa.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+                Menunggu: {memuat ? "..." : izinMenunggu}
+              </span>
+              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                Disetujui: {memuat ? "..." : izinDisetujui}
+              </span>
+            </div>
+          </div>
+
+          {memuat ? (
+            <p className="p-8 text-center text-xs text-slate-400">
+              Memuat daftar surat izin...
+            </p>
+          ) : daftarIzin.length === 0 ? (
+            <p className="p-8 text-center text-xs text-slate-400">
+              Belum ada pengajuan surat izin dari siswa.
+            </p>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full min-w-[900px] text-left text-xs">
+                <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
+                  <tr>
+                    <th className="p-3">ID Izin</th>
+                    <th className="p-3">Siswa</th>
+                    <th className="p-3">Jenis & Tanggal</th>
+                    <th className="p-3">Alasan</th>
+                    <th className="p-3">Status</th>
+                    <th className="p-3 text-right">Aksi</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {daftarIzin.map((item) => {
+                    const status = normalisasiStatusIzin(item.status);
+                    const kode =
+                      item.kodeBerkas ||
+                      `IZIN-${String(item.id).padStart(3, "0")}`;
+                    const badge =
+                      status === "DISETUJUI"
+                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                        : status === "DITOLAK"
+                          ? "border-rose-200 bg-rose-50 text-rose-700"
+                          : "border-amber-200 bg-amber-50 text-amber-700";
+
+                    return (
+                      <tr
+                        key={item.id}
+                        className="transition hover:bg-slate-50/70"
+                      >
+                        <td className="p-3 font-mono text-[11px] font-bold text-slate-700">
+                          {kode}
+                        </td>
+                        <td className="p-3">
+                          <p className="font-bold text-slate-900">
+                            {item.nama}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {item.nisn} • {item.kelas}
+                          </p>
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          <p className="font-semibold text-slate-700">
+                            {item.jenis}
+                          </p>
+                          <p className="text-[10px] text-slate-400">
+                            {item.tanggal}
+                          </p>
+                        </td>
+                        <td className="max-w-xs p-3 text-slate-500">
+                          {item.alasan}
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          <span
+                            className={`rounded border px-2 py-0.5 text-[10px] font-bold ${badge}`}
+                          >
+                            {status}
+                          </span>
+                          {(item.disetujuiOleh || item.diverifikasiOleh) && (
+                            <p className="mt-1 max-w-[150px] text-[10px] text-slate-400">
+                              oleh{" "}
+                              {item.disetujuiOleh || item.diverifikasiOleh}
+                            </p>
+                          )}
+                        </td>
+                        <td className="whitespace-nowrap p-3 text-right">
+                          <div className="flex justify-end gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateStatusIzin(item.id, "Disetujui")
+                              }
+                              disabled={memprosesIzin === item.id}
+                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                            >
+                              Setujui
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                handleUpdateStatusIzin(item.id, "Ditolak")
+                              }
+                              disabled={memprosesIzin === item.id}
+                              className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                            >
+                              Tolak
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <section className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
@@ -327,6 +539,10 @@ export default function AdminTuPage() {
           </section>
         </div>
       </div>
+      <NotifikasiWhatsAppFallback
+        data={fallbackWa}
+        onClose={() => setFallbackWa(null)}
+      />
     </main>
   );
 }

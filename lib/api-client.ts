@@ -20,6 +20,7 @@ import type {
   SuratIzinItem,
 } from "./types";
 import { KATEGORI_PENGAMBILAN_IJAZAH } from "./constants";
+import type { InfoNotifikasiWaServer } from "./izin-notifikasi";
 import { STORAGE_KEYS } from "./storage";
 
 interface ApiError {
@@ -168,8 +169,10 @@ export const api = {
     id: number,
     status: string,
     catatan?: string
-  ): Promise<SuratIzinItem> {
-    return permintaan<SuratIzinItem>(`/api/leave-requests/${id}`, {
+  ): Promise<SuratIzinItem & { notifikasiWa?: InfoNotifikasiWaServer }> {
+    return permintaan<
+      SuratIzinItem & { notifikasiWa?: InfoNotifikasiWaServer }
+    >(`/api/leave-requests/${id}`, {
       method: "PATCH",
       body: JSON.stringify({ status, catatan }),
     });

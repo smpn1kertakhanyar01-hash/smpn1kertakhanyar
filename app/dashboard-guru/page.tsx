@@ -4,9 +4,20 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import NotifikasiWhatsAppFallback, {
+  type DataFallbackWhatsApp,
+} from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
 import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH, KELAS_UTAMA } from "@/lib/constants";
 import { daftarAkunSandiSiswaFallback } from "@/lib/data";
+import { kirimNotifikasiPersetujuanIzin } from "@/lib/izin-notifikasi";
+import {
+  ambilDaftarIzinLengkap,
+  berlanggananPerubahanIzin,
+  hapusSemuaOverrideIzin,
+  simpanOverrideIzin,
+  terapkanOverrideIzin,
+} from "@/lib/izin-store";
 import {
   apakahLogin,
   bacaPeranPegawai,
@@ -24,7 +35,11 @@ import type {
   PresensiItem,
   SuratIzinItem,
 } from "@/lib/types";
-import { buatUrlWhatsApp } from "@/lib/utils";
+import {
+  apakahNomorDummyIzin,
+  buatUrlWhatsApp,
+  buatUrlWhatsAppDenganPesan,
+} from "@/lib/utils";
 
 /**
  * Angka statistik cadangan agar kartu dashboard tetap informatif ketika
@@ -125,6 +140,8 @@ export default function DashboardGuruPage() {
   const [memuatSyaratIjazah, setMemuatSyaratIjazah] = useState(true);
   const [menyimpanSyaratIjazah, setMenyimpanSyaratIjazah] = useState(false);
   const [notifikasiSukses, setNotifikasiSukses] = useState("");
+  const [fallbackWa, setFallbackWa] =
+    useState<DataFallbackWhatsApp | null>(null);
 
   // Form Input Kejadian Harian
   const [formKejadian, setFormKejadian] = useState<FormKejadian>({
@@ -192,7 +209,7 @@ export default function DashboardGuruPage() {
         if (!masihAktif) return;
 
         setDaftarPresensi(presensi);
-        setDaftarIzin(izin);
+        setDaftarIzin(ambilDaftarIzinLengkap(izin));
         setDaftarKejadian(kejadian);
         setPengunjungHariIni(statistik.hariIni);
         setRiwayatKunjungan(statistik.riwayat);
@@ -258,6 +275,20 @@ export default function DashboardGuruPage() {
     return () => window.clearTimeout(timer);
   }, [notifikasiSukses]);
 
+  // Sinkronkan status izin lintas tab/halaman (guru, TU, dan siswa).
+  useEffect(() => {
+    const berhenti = berlanggananPerubahanIzin(() => {
+      if (!apakahLogin("guru")) return;
+      api
+        .getLeaveRequests()
+        .then((data) => setDaftarIzin(ambilDaftarIzinLengkap(data)))
+        .catch((error) =>
+          console.error("Gagal menyinkronkan status izin:", error)
+        );
+    });
+    return berhenti;
+  }, []);
+
   const handleLogout = async () => {
     try {
       await api.logout();
@@ -318,91 +349,119 @@ export default function DashboardGuruPage() {
       }
 
       const hasil = await api.updateLeaveRequestStatus(id, statusBaru, catatan);
+
+      // Simpan lebih dulu agar Dashboard TU dan Status Izin Siswa langsung
+      // membaca status yang sama tanpa menunggu reload. Baru setelah itu
+      // terapkan override supaya status terbaru tidak tertimpa keputusan lama.
+      simpanOverrideIzin(hasil);
+      const izinTerbaru = terapkanOverrideIzin(hasil);
       setDaftarIzin((prev) =>
-        prev.map((item) => (item.id === id ? hasil : item))
+        prev.map((item) => (item.id === id ? izinTerbaru : item))
       );
 
       if (statusBaru === "Disetujui") {
-        const izin = hasil || daftarIzin.find((i) => i.id === id);
-        if (izin && izin.noTeleponWali) {
-          try {
-            const noReg = `IZN-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${String(izin.id).padStart(6,"0")}`;
-            const pdfUrl = typeof window !== "undefined" ? `${window.location.origin}/api/surat-izin/pdf?id=${izin.id}` : undefined;
-            const pesan = `🏛️ SMP NEGERI 1 KERTAK HANYAR
-Pemberitahuan Status Permohonan Izin Siswa
-━━━━━━━━━━━━━━━━━━━━━━━━━━━
+        // Gunakan info notifikasi (template pesan + tautan wa.me + penanda
+        // nomor dummy) yang disusun handler approval di server.
+        const notifikasi = await kirimNotifikasiPersetujuanIzin(
+          izinTerbaru,
+          hasil.notifikasiWa
+        );
 
-Yth. Orang Tua / Wali dari ananda:
-Nama Siswa : ${izin.nama}
-NISN       : ${izin.nisn}
-Kelas      : ${izin.kelas}
-
-Status Pengajuan:
-✅ DISETUJUI / DIKONFIRMASI
-
-Rincian Izin:
-• No. Registrasi : ${noReg}
-• Jenis Izin     : ${izin.jenis}
-• Periode        : ${izin.tanggal}
-• Alasan         : ${izin.alasan}
-• Diverifikasi   : ${izin.diverifikasiOleh || "Petugas Sekolah"}
-
-Demikian pemberitahuan ini disampaikan. Surat izin elektronik ini sah dan telah tercatat dalam sistem absensi sekolah.
-
-Pesan otomatis dari Sistem Informasi SMPN 1 Kertak Hanyar`;
-            await fetch("/api/notifikasi-wa", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                nomorWa: izin.noTeleponWali,
-                namaSiswa: izin.nama,
-                kelas: izin.kelas,
-                noReg,
-                jenisIzin: izin.jenis,
-                tanggalIzin: izin.tanggal,
-                pdfUrl,
-                pesan,
-              }),
-            });
-            alert("Surat izin berhasil disetujui dan notifikasi WA telah dikirim ke orang tua.");
-          } catch (waErr) {
-            console.error("Gagal mengirim notifikasi WA saat persetujuan:", waErr);
-            alert("Surat izin berhasil disetujui. Namun notifikasi WA gagal dikirim.");
-          }
+        if (notifikasi.terkirim) {
+          setNotifikasiSukses(
+            `Surat izin ${izinTerbaru.nama} disetujui dan notifikasi WhatsApp terkirim.`
+          );
         } else {
-          alert("Surat izin berhasil disetujui.");
+          setFallbackWa({ ...notifikasi, nama: izinTerbaru.nama });
+          setNotifikasiSukses(
+            `Surat izin ${izinTerbaru.nama} disetujui. Notifikasi WA dapat dikirim manual.`
+          );
         }
       } else if (statusBaru === "Ditolak") {
-        const izin = hasil || daftarIzin.find((i) => i.id === id);
-        if (izin && izin.noTeleponWali) {
-          try {
-            const noReg = `IZN-${new Date().toISOString().slice(0,10).replace(/-/g,"")}-${String(izin.id).padStart(6,"0")}`;
-            const pesan = `Yth. Bapak/Ibu ${izin.namaWali || ""},
-Permohonan izin untuk siswa: ${izin.nama} (Kelas ${izin.kelas}) dengan No. Registrasi: ${noReg} DITOLAK oleh ${hasil?.diverifikasiOleh || "petugas sekolah"}.
+        const noReg = `IZN-${new Date().toISOString().slice(0, 10).replace(/-/g, "")}-${String(izinTerbaru.id).padStart(6, "0")}`;
+        const pesan = `Yth. Bapak/Ibu ${izinTerbaru.namaWali || ""},
+Permohonan izin untuk siswa: ${izinTerbaru.nama} (Kelas ${izinTerbaru.kelas}) dengan No. Registrasi: ${noReg} DITOLAK oleh ${izinTerbaru.diverifikasiOleh || "petugas sekolah"}.
 
 Alasan Penolakan: ${catatan || "-"}
 
 Silakan mengajukan kembali dengan kelengkapan berkas yang sesuai atau hubungi pihak sekolah untuk informasi lebih lanjut.
 
 Terima kasih.`;
-            await fetch("/api/notifikasi-wa", {
+
+        const nomorWali = izinTerbaru.noTeleponWali;
+
+        if (nomorWali && apakahNomorDummyIzin(nomorWali)) {
+          // Nomor dummy tidak perlu menghabiskan kuota Fonnte; tampilkan
+          // langsung tautan WhatsApp Web sebagai fallback.
+          setFallbackWa({
+            terkirim: false,
+            dummy: true,
+            waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
+            pesan,
+            nomor: nomorWali,
+            nama: izinTerbaru.nama,
+            alasan:
+              "Nomor wali terdeteksi sebagai nomor dummy. Gunakan tombol WhatsApp Web untuk mengirim pesan secara manual.",
+          });
+          setNotifikasiSukses(
+            `Surat izin ${izinTerbaru.nama} ditolak. Notifikasi WA dapat dikirim manual.`
+          );
+        } else if (nomorWali) {
+          try {
+            const response = await fetch("/api/notifikasi-wa", {
               method: "POST",
               headers: { "Content-Type": "application/json" },
               body: JSON.stringify({
-                nomorWa: izin.noTeleponWali,
-                namaSiswa: izin.nama,
-                kelas: izin.kelas,
+                nomorWa: nomorWali,
+                namaSiswa: izinTerbaru.nama,
+                kelas: izinTerbaru.kelas,
                 noReg,
                 pesan,
               }),
             });
-            alert("Surat izin ditolak dan notifikasi penolakan telah dikirim ke orang tua.");
+            const data = (await response.json().catch(() => ({}))) as {
+              ok?: boolean;
+              error?: string;
+            };
+
+            if (!response.ok || data.ok === false) {
+              setFallbackWa({
+                terkirim: false,
+                dummy: false,
+                waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
+                pesan,
+                nomor: nomorWali,
+                nama: izinTerbaru.nama,
+                alasan:
+                  data.error ||
+                  "Notifikasi penolakan gagal dikirim otomatis. Gunakan WhatsApp Web untuk mengirim manual.",
+              });
+              setNotifikasiSukses(
+                `Surat izin ${izinTerbaru.nama} ditolak. Notifikasi WA dapat dikirim manual.`
+              );
+            } else {
+              setNotifikasiSukses(
+                `Surat izin ${izinTerbaru.nama} ditolak dan notifikasi penolakan telah dikirim.`
+              );
+            }
           } catch (waErr) {
-            console.error("Gagal mengirim notifikasi WA saat penolakan:", waErr);
-            alert("Surat izin berhasil ditolak. Namun notifikasi WA gagal dikirim.");
+            console.error(
+              "Gagal mengirim notifikasi WA saat penolakan:",
+              waErr
+            );
+            setFallbackWa({
+              terkirim: false,
+              dummy: false,
+              waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
+              pesan,
+              nomor: nomorWali,
+              nama: izinTerbaru.nama,
+              alasan:
+                "Notifikasi penolakan gagal dikirim otomatis. Gunakan WhatsApp Web untuk mengirim manual.",
+            });
           }
         } else {
-          alert("Surat izin berhasil ditolak.");
+          setNotifikasiSukses(`Surat izin ${izinTerbaru.nama} ditolak.`);
         }
       }
     } catch (error) {
@@ -471,6 +530,7 @@ Terima kasih.`;
 
     try {
       await api.deleteAllLeaveRequests();
+      hapusSemuaOverrideIzin();
       setDaftarIzin([]);
     } catch (error) {
       console.error("Gagal menghapus surat izin:", error);
@@ -744,9 +804,9 @@ Terima kasih.`;
       ? daftarKejadian.length
       : STATISTIK_FALLBACK.insiden;
   const angkaIzinMenunggu =
-    izinMenunggu > 0 ? izinMenunggu : STATISTIK_FALLBACK.izinMenunggu;
+    daftarIzin.length > 0 ? izinMenunggu : STATISTIK_FALLBACK.izinMenunggu;
   const angkaIzinDisetujui =
-    izinDisetujui > 0 ? izinDisetujui : STATISTIK_FALLBACK.izinDisetujui;
+    daftarIzin.length > 0 ? izinDisetujui : STATISTIK_FALLBACK.izinDisetujui;
   const ijazahBelumDiambil = daftarIjazah.filter(
     (item) => item.status === "Belum Diambil"
   ).length;
@@ -2313,6 +2373,12 @@ Terima kasih.`;
           </div>
         </div>
       )}
+
+      {/* Fallback WhatsApp Web saat Fonnte gagal / nomor dummy */}
+      <NotifikasiWhatsAppFallback
+        data={fallbackWa}
+        onClose={() => setFallbackWa(null)}
+      />
 
       {/* Modal Foto Surat Bukti */}
       {modalFoto && (

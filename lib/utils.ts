@@ -34,6 +34,52 @@ export function buatUrlWhatsApp(nomor: string, namaSiswa: string): string {
   return `https://wa.me/${nomorBersih}?text=${pesan}`;
 }
 
+/** Ubah nomor WhatsApp ke format lokal 08xx untuk pemeriksaan nomor dummy. */
+export function nomorWhatsAppLokal(nomor?: string): string {
+  let nomorBersih = (nomor ?? "").replace(/[^0-9]/g, "");
+  if (nomorBersih.startsWith("62")) {
+    nomorBersih = "0" + nomorBersih.slice(2);
+  }
+  return nomorBersih;
+}
+
+/**
+ * Nomor contoh 0812563225xx dipakai pada data demo. Nomor seperti ini tidak
+ * boleh dianggap sebagai nomor wali sungguhan sehingga UI perlu menampilkan
+ * tautan WhatsApp Web sebagai fallback.
+ */
+export function apakahNomorDummyIzin(nomor?: string): boolean {
+  return /^0812563225\d{2}$/.test(nomorWhatsAppLokal(nomor));
+}
+
+/** Template pesan resmi persetujuan izin sesuai permintaan sekolah. */
+export function buatPesanPersetujuanIzin(params: {
+  nama: string;
+  jenis?: string;
+  tanggal: string;
+}): string {
+  const jenisIzin = (params.jenis ?? "").toLowerCase().includes("sakit")
+    ? "izin sakit"
+    : "izin";
+  return `Yth. Orang Tua/Wali dari ${params.nama}, permohonan ${jenisIzin} tanggal ${params.tanggal} telah DISETUJUI oleh pihak SMP Negeri 1 Kertak Hanyar. Terima kasih.`;
+}
+
+/** Buat tautan WhatsApp Web dengan pesan yang sudah diisi otomatis. */
+export function buatUrlWhatsAppDenganPesan(
+  nomor: string,
+  pesan: string
+): string {
+  let nomorBersih = nomor.replace(/[^0-9]/g, "");
+
+  if (nomorBersih.startsWith("0")) {
+    nomorBersih = "62" + nomorBersih.substring(1);
+  } else if (nomorBersih.startsWith("8")) {
+    nomorBersih = "62" + nomorBersih;
+  }
+
+  return `https://wa.me/${nomorBersih}?text=${encodeURIComponent(pesan)}`;
+}
+
 export interface IdentitasSiswaTersamar {
   nama: string;
   kelas: string;
