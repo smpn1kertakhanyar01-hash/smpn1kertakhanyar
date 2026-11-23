@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import ImporDataSiswa from "@/components/ImporDataSiswa";
+import PasswordInput from "@/components/PasswordInput";
 import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
@@ -795,8 +796,7 @@ export default function AdminTuPage() {
                 <label className="mb-1 block font-bold text-slate-700">
                   Kata Sandi Lama
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   value={sandiLama}
                   onChange={(e) => setSandiLama(e.target.value)}
@@ -807,8 +807,7 @@ export default function AdminTuPage() {
                 <label className="mb-1 block font-bold text-slate-700">
                   Kata Sandi Baru
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   minLength={6}
                   value={sandiBaru}
@@ -820,8 +819,7 @@ export default function AdminTuPage() {
                 <label className="mb-1 block font-bold text-slate-700">
                   Konfirmasi Kata Sandi Baru
                 </label>
-                <input
-                  type="password"
+                <PasswordInput
                   required
                   minLength={6}
                   value={konfirmasi}

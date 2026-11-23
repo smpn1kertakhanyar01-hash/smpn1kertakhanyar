@@ -4,6 +4,7 @@ import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 import { NOMOR_WHATSAPP } from "@/lib/constants";
 import { cariSiswaLokalUntukLogin } from "@/lib/siswa-store";
 import { simpanSesiSiswa, STORAGE_KEYS } from "@/lib/storage";
@@ -182,8 +183,7 @@ export default function LoginSiswaPage() {
             <label className="block font-bold text-slate-700 mb-1">
               Kata Sandi
             </label>
-            <input
-              type="password"
+            <PasswordInput
               required
               placeholder="Masukkan kata sandi"
               value={password}

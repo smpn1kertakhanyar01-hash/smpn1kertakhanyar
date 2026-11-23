@@ -4,6 +4,7 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 import { api } from "@/lib/api-client";
 import { KELAS_PENDAFTARAN } from "@/lib/constants";
 
@@ -104,8 +105,7 @@ export default function RegisterSiswa() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Buat Kata Sandi Baru</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               placeholder="Minimal 6 karakter"
               value={formData.password}
@@ -116,8 +116,7 @@ export default function RegisterSiswa() {
 
           <div>
             <label className="block text-xs font-bold text-slate-700 mb-1">Konfirmasi Kata Sandi</label>
-            <input
-              type="password"
+            <PasswordInput
               required
               placeholder="Ulangi kata sandi"
               value={formData.konfirmasiPassword}

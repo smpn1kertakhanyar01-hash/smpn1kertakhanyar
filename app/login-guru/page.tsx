@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import PasswordInput from "@/components/PasswordInput";
 import { api } from "@/lib/api-client";
 import { simpanSesiGuru } from "@/lib/storage";
 
@@ -106,8 +107,7 @@ export default function LoginGuruPage() {
             <label className="block font-bold text-slate-700 mb-1">
               Kata Sandi
             </label>
-            <input
-              type="password"
+            <PasswordInput
               required
               placeholder="Kata sandi akun pegawai"
               value={password}
