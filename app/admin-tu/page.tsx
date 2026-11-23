@@ -34,10 +34,24 @@ import {
 } from "@/lib/storage";
 import type { MutasiSiswa, SuratIzinItem } from "@/lib/types";
 
+type TabTu =
+  | "Data Siswa & PPDB"
+  | "Verifikasi Surat Izin"
+  | "Mutasi & Ijazah"
+  | "Pengaturan Akun";
+
+const DAFTAR_TAB_TU: { id: TabTu; ikon: string }[] = [
+  { id: "Data Siswa & PPDB", ikon: "👥" },
+  { id: "Verifikasi Surat Izin", ikon: "📨" },
+  { id: "Mutasi & Ijazah", ikon: "📑" },
+  { id: "Pengaturan Akun", ikon: "⚙️" },
+];
+
 export default function AdminTuPage() {
   const router = useRouter();
   const [siap, setSiap] = useState(false);
   const [nama, setNama] = useState("");
+  const [tabAktif, setTabAktif] = useState<TabTu>("Data Siswa & PPDB");
   const [daftarMutasi, setDaftarMutasi] = useState<MutasiSiswa[]>([]);
   const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
   const [daftarSiswa, setDaftarSiswa] = useState<SiswaLokal[]>([]);
@@ -109,7 +123,7 @@ export default function AdminTuPage() {
     };
   }, [router]);
 
-  // Sinkronkan keputusan izin dengan Dashboard Guru dan portal siswa.
+  // Sinkronkan keputusan izin dengan portal guru dan portal siswa.
   useEffect(() => {
     const berhenti = berlanggananPerubahanIzin(() => {
       if (
@@ -154,7 +168,7 @@ export default function AdminTuPage() {
       setMemprosesIzin(id);
 
       // Update state + localStorage lebih dulu agar keputusan langsung
-      // tercermin di Dashboard Guru dan Status Izin Siswa meskipun data
+      // tercermin di portal guru dan Status Izin Siswa meskipun data
       // pengajuan hanya tersimpan di browser (Vercel stateless).
       const itemSebelumnya = daftarIzin.find((item) => item.id === id);
       const izinLokal: SuratIzinItem = {
@@ -334,12 +348,6 @@ export default function AdminTuPage() {
       >
         <div className="flex items-center gap-2">
           <Link
-            href="/dashboard-guru"
-            className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
-          >
-            Portal Guru
-          </Link>
-          <Link
             href="/"
             className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
           >
@@ -413,295 +421,348 @@ export default function AdminTuPage() {
           </div>
         </div>
 
-        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                Data Siswa / Backup Sandi Siswa
-              </h2>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                Daftar siswa aktif dan sandi awal. Impor data PPDB secara massal
-                dari file CSV.
-              </p>
-            </div>
-            <div className="flex flex-col items-stretch gap-2 sm:items-end">
-              <input
-                type="search"
-                value={pencarianSiswa}
-                onChange={(e) => setPencarianSiswa(e.target.value)}
-                placeholder="Cari NISN, nama, atau kelas..."
-                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-64"
-              />
-              <ImporDataSiswa
-                daftarSiswaSaatIni={daftarSiswa}
-                onSelesaiImpor={() =>
-                  setDaftarSiswa((sebelumnya) =>
-                    gabungkanSiswaLokalLengkap(sebelumnya)
-                  )
-                }
-              />
-            </div>
-          </div>
+        {/* Navigasi tab: satu menu aktif agar halaman tidak menumpuk ke bawah. */}
+        <nav
+          aria-label="Navigasi Dashboard Tata Usaha"
+          className="mb-6 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:grid-cols-4"
+        >
+          {DAFTAR_TAB_TU.map((tab) => (
+            <button
+              key={tab.id}
+              type="button"
+              onClick={() => setTabAktif(tab.id)}
+              aria-current={tabAktif === tab.id ? "page" : undefined}
+              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[11px] font-bold transition sm:text-xs ${
+                tabAktif === tab.id
+                  ? "bg-blue-600 text-white shadow-sm"
+                  : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
+              }`}
+            >
+              <span aria-hidden="true">{tab.ikon}</span>
+              <span>{tab.id}</span>
+            </button>
+          ))}
+        </nav>
 
-          <div className="px-4 py-2.5 text-[10px] font-semibold text-slate-500">
-            {siswaTampil.length} dari {daftarSiswa.length} siswa ditampilkan
-          </div>
-
-          {siswaTampil.length === 0 ? (
-            <p className="p-8 text-center text-xs text-slate-400">
-              Tidak ada siswa yang cocok dengan pencarian.
-            </p>
-          ) : (
-            <div className="max-h-[360px] overflow-auto">
-              <table className="w-full min-w-[720px] text-left text-xs">
-                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
-                  <tr>
-                    <th className="p-3">NISN</th>
-                    <th className="p-3">Nama Lengkap</th>
-                    <th className="p-3">Kelas</th>
-                    <th className="p-3">Sandi Awal</th>
-                    <th className="p-3">No WA Wali</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {siswaTampil.map((siswa) => (
-                    <tr
-                      key={siswa.nisn}
-                      className="transition hover:bg-slate-50/70"
-                    >
-                      <td className="whitespace-nowrap p-3 font-mono text-[11px] font-bold text-slate-700">
-                        {siswa.nisn}
-                      </td>
-                      <td className="p-3 font-semibold text-slate-800">
-                        {siswa.nama}
-                      </td>
-                      <td className="whitespace-nowrap p-3 text-slate-600">
-                        {siswa.kelas || "-"}
-                      </td>
-                      <td className="whitespace-nowrap p-3">
-                        <code className="rounded border border-slate-200 bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700">
-                          {siswa.sandi}
-                        </code>
-                      </td>
-                      <td className="whitespace-nowrap p-3 text-slate-500">
-                        {siswa.noWaWali || "-"}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-          <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <h2 className="text-sm font-bold text-slate-900">
-                Verifikasi Surat Izin Siswa
-              </h2>
-              <p className="mt-0.5 text-[11px] text-slate-500">
-                Keputusan Tata Usaha langsung tersinkron ke Dashboard Guru dan
-                halaman Status Izin Siswa.
-              </p>
-            </div>
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
-                Menunggu: {memuat ? "..." : izinMenunggu}
-              </span>
-              <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
-                Disetujui: {memuat ? "..." : izinDisetujui}
-              </span>
-              {daftarIzin.length > 0 && (
-                <button
-                  type="button"
-                  onClick={handleResetIzin}
-                  className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100"
-                >
-                  Hapus Semua
-                </button>
-              )}
-            </div>
-          </div>
-
-          {memuat ? (
-            <p className="p-8 text-center text-xs text-slate-400">
-              Memuat daftar surat izin...
-            </p>
-          ) : daftarIzin.length === 0 ? (
-            <p className="p-8 text-center text-xs text-slate-400">
-              Belum ada pengajuan surat izin dari siswa.
-            </p>
-          ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full min-w-[900px] text-left text-xs">
-                <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
-                  <tr>
-                    <th className="p-3">ID Izin</th>
-                    <th className="p-3">Siswa</th>
-                    <th className="p-3">Jenis & Tanggal</th>
-                    <th className="p-3">Alasan</th>
-                    <th className="p-3">Status</th>
-                    <th className="p-3 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-slate-100">
-                  {daftarIzin.map((item) => {
-                    const status = normalisasiStatusIzin(item.status);
-                    const kode =
-                      item.kodeBerkas ||
-                      `IZIN-${String(item.id).padStart(3, "0")}`;
-                    const badge =
-                      status === "DISETUJUI"
-                        ? "border-emerald-200 bg-emerald-50 text-emerald-700"
-                        : status === "DITOLAK"
-                          ? "border-rose-200 bg-rose-50 text-rose-700"
-                          : "border-amber-200 bg-amber-50 text-amber-700";
-
-                    return (
-                      <tr
-                        key={item.id}
-                        className="transition hover:bg-slate-50/70"
-                      >
-                        <td className="p-3 font-mono text-[11px] font-bold text-slate-700">
-                          {kode}
-                        </td>
-                        <td className="p-3">
-                          <p className="font-bold text-slate-900">
-                            {item.nama}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {item.nisn} • {item.kelas}
-                          </p>
-                        </td>
-                        <td className="whitespace-nowrap p-3">
-                          <p className="font-semibold text-slate-700">
-                            {item.jenis}
-                          </p>
-                          <p className="text-[10px] text-slate-400">
-                            {item.tanggal}
-                          </p>
-                        </td>
-                        <td className="max-w-xs p-3 text-slate-500">
-                          {item.alasan}
-                        </td>
-                        <td className="whitespace-nowrap p-3">
-                          <span
-                            className={`rounded border px-2 py-0.5 text-[10px] font-bold ${badge}`}
-                          >
-                            {status}
-                          </span>
-                          {(item.disetujuiOleh || item.diverifikasiOleh) && (
-                            <p className="mt-1 max-w-[150px] text-[10px] text-slate-400">
-                              oleh{" "}
-                              {item.disetujuiOleh || item.diverifikasiOleh}
-                            </p>
-                          )}
-                        </td>
-                        <td className="whitespace-nowrap p-3 text-right">
-                          <div className="flex justify-end gap-1.5">
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStatusIzin(item.id, "Disetujui")
-                              }
-                              disabled={memprosesIzin === item.id}
-                              className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
-                            >
-                              Setujui
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() =>
-                                handleUpdateStatusIzin(item.id, "Ditolak")
-                              }
-                              disabled={memprosesIzin === item.id}
-                              className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
-                            >
-                              Tolak
-                            </button>
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </section>
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <section className="lg:col-span-2 bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
-            <div className="flex items-start justify-between gap-3">
+        {tabAktif === "Data Siswa & PPDB" && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-sm font-bold text-slate-900">
-                  Menu Utama Tata Usaha
+                  Data Siswa / Backup Sandi Siswa
                 </h2>
-                <p className="text-xs text-slate-500 mt-1">
-                  Verifikasi berkas, input nomor surat, lalu setujui atau tolak
-                  pengajuan mutasi.
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Daftar siswa aktif dan sandi awal. Impor data PPDB secara massal
+                  dari file CSV.
                 </p>
               </div>
-              <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-2 py-1 rounded-lg">
-                ADMIN_TU
-              </span>
+              <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                <input
+                  type="search"
+                  value={pencarianSiswa}
+                  onChange={(e) => setPencarianSiswa(e.target.value)}
+                  placeholder="Cari NISN, nama, atau kelas..."
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-64"
+                />
+                <ImporDataSiswa
+                  daftarSiswaSaatIni={daftarSiswa}
+                  onSelesaiImpor={() =>
+                    setDaftarSiswa((sebelumnya) =>
+                      gabungkanSiswaLokalLengkap(sebelumnya)
+                    )
+                  }
+                />
+              </div>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-5">
+            <div className="px-4 py-2.5 text-[10px] font-semibold text-slate-500">
+              {siswaTampil.length} dari {daftarSiswa.length} siswa ditampilkan
+            </div>
+
+            {siswaTampil.length === 0 ? (
+              <p className="p-8 text-center text-xs text-slate-400">
+                Tidak ada siswa yang cocok dengan pencarian.
+              </p>
+            ) : (
+              <div className="max-h-[420px] overflow-auto">
+                <table className="w-full min-w-[720px] text-left text-xs">
+                  <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
+                    <tr>
+                      <th className="p-3">NISN</th>
+                      <th className="p-3">Nama Lengkap</th>
+                      <th className="p-3">Kelas</th>
+                      <th className="p-3">Sandi Awal</th>
+                      <th className="p-3">No WA Wali</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {siswaTampil.map((siswa) => (
+                      <tr
+                        key={siswa.nisn}
+                        className="transition hover:bg-slate-50/70"
+                      >
+                        <td className="whitespace-nowrap p-3 font-mono text-[11px] font-bold text-slate-700">
+                          {siswa.nisn}
+                        </td>
+                        <td className="p-3 font-semibold text-slate-800">
+                          {siswa.nama}
+                        </td>
+                        <td className="whitespace-nowrap p-3 text-slate-600">
+                          {siswa.kelas || "-"}
+                        </td>
+                        <td className="whitespace-nowrap p-3">
+                          <code className="rounded border border-slate-200 bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700">
+                            {siswa.sandi}
+                          </code>
+                        </td>
+                        <td className="whitespace-nowrap p-3 text-slate-500">
+                          {siswa.noWaWali || "-"}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {tabAktif === "Verifikasi Surat Izin" && (
+          <section className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+            <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Verifikasi Surat Izin Siswa
+                </h2>
+                <p className="mt-0.5 text-[11px] text-slate-500">
+                  Keputusan Tata Usaha langsung tersinkron ke portal guru dan
+                  halaman Status Izin Siswa.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="rounded-lg border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] font-bold text-amber-700">
+                  Menunggu: {memuat ? "..." : izinMenunggu}
+                </span>
+                <span className="rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                  Disetujui: {memuat ? "..." : izinDisetujui}
+                </span>
+                {daftarIzin.length > 0 && (
+                  <button
+                    type="button"
+                    onClick={handleResetIzin}
+                    className="rounded-lg border border-rose-200 bg-rose-50 px-2 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100"
+                  >
+                    Hapus Semua
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {memuat ? (
+              <p className="p-8 text-center text-xs text-slate-400">
+                Memuat daftar surat izin...
+              </p>
+            ) : daftarIzin.length === 0 ? (
+              <p className="p-8 text-center text-xs text-slate-400">
+                Belum ada pengajuan surat izin dari siswa.
+              </p>
+            ) : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[900px] text-left text-xs">
+                  <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
+                    <tr>
+                      <th className="p-3">ID Izin</th>
+                      <th className="p-3">Siswa</th>
+                      <th className="p-3">Jenis &amp; Tanggal</th>
+                      <th className="p-3">Alasan</th>
+                      <th className="p-3">Status</th>
+                      <th className="p-3 text-right">Aksi</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-slate-100">
+                    {daftarIzin.map((item) => {
+                      const status = normalisasiStatusIzin(item.status);
+                      const kode =
+                        item.kodeBerkas ||
+                        `IZIN-${String(item.id).padStart(3, "0")}`;
+                      const badge =
+                        status === "DISETUJUI"
+                          ? "border-emerald-200 bg-emerald-50 text-emerald-700"
+                          : status === "DITOLAK"
+                            ? "border-rose-200 bg-rose-50 text-rose-700"
+                            : "border-amber-200 bg-amber-50 text-amber-700";
+
+                      return (
+                        <tr
+                          key={item.id}
+                          className="transition hover:bg-slate-50/70"
+                        >
+                          <td className="p-3 font-mono text-[11px] font-bold text-slate-700">
+                            {kode}
+                          </td>
+                          <td className="p-3">
+                            <p className="font-bold text-slate-900">
+                              {item.nama}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {item.nisn} • {item.kelas}
+                            </p>
+                          </td>
+                          <td className="whitespace-nowrap p-3">
+                            <p className="font-semibold text-slate-700">
+                              {item.jenis}
+                            </p>
+                            <p className="text-[10px] text-slate-400">
+                              {item.tanggal}
+                            </p>
+                          </td>
+                          <td className="max-w-xs p-3 text-slate-500">
+                            {item.alasan}
+                          </td>
+                          <td className="whitespace-nowrap p-3">
+                            <span
+                              className={`rounded border px-2 py-0.5 text-[10px] font-bold ${badge}`}
+                            >
+                              {status}
+                            </span>
+                            {(item.disetujuiOleh || item.diverifikasiOleh) && (
+                              <p className="mt-1 max-w-[150px] text-[10px] text-slate-400">
+                                oleh{" "}
+                                {item.disetujuiOleh || item.diverifikasiOleh}
+                              </p>
+                            )}
+                          </td>
+                          <td className="whitespace-nowrap p-3 text-right">
+                            <div className="flex justify-end gap-1.5">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateStatusIzin(item.id, "Disetujui")
+                                }
+                                disabled={memprosesIzin === item.id}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1 text-[10px] font-bold text-white transition hover:bg-emerald-700 disabled:opacity-50"
+                              >
+                                Setujui
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  handleUpdateStatusIzin(item.id, "Ditolak")
+                                }
+                                disabled={memprosesIzin === item.id}
+                                className="rounded-lg border border-rose-200 bg-rose-50 px-2.5 py-1 text-[10px] font-bold text-rose-600 transition hover:bg-rose-100 disabled:opacity-50"
+                              >
+                                Tolak
+                              </button>
+                            </div>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
+            )}
+          </section>
+        )}
+
+        {tabAktif === "Mutasi & Ijazah" && (
+          <div className="grid grid-cols-1 gap-5 lg:grid-cols-2">
+            <section className="rounded-2xl border border-blue-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Kelola Mutasi Siswa
+                  </h2>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    Verifikasi berkas, input nomor surat, lalu setujui atau tolak
+                    pengajuan mutasi.
+                  </p>
+                </div>
+                <span className="shrink-0 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[10px] font-bold text-emerald-700">
+                  ADMIN_TU
+                </span>
+              </div>
+
+              <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-blue-100 bg-blue-50/60 p-4">
+                <div>
+                  <p className="text-[10px] font-bold uppercase tracking-wider text-blue-700">
+                    Rekap Mutasi
+                  </p>
+                  <p className="mt-1 text-[11px] text-blue-900">
+                    {daftarMutasi.length} berkas · {totalMasuk} masuk ·{" "}
+                    {totalKeluar} keluar · {belumDiputuskan} belum diputuskan
+                  </p>
+                </div>
+                <span className="text-2xl" aria-hidden="true">
+                  📑
+                </span>
+              </div>
+
               <Link
                 href="/admin-tu/mutasi"
-                className="group border border-blue-200 bg-blue-50/60 hover:bg-blue-50 rounded-2xl p-4 transition"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-blue-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-blue-700"
               >
-                <span className="text-xl">📑</span>
-                <h3 className="text-sm font-bold text-blue-900 mt-2 group-hover:text-blue-700">
-                  Kelola Mutasi Siswa
-                </h3>
-                <p className="text-[11px] text-blue-800 mt-1 leading-relaxed">
-                  Daftar mutasi masuk & keluar, verifikasi berkas fisik, nomor
-                  surat, serta keputusan TU.
-                </p>
+                Buka Kelola Mutasi →
               </Link>
+            </section>
 
-              <Link
-                href="/dashboard-guru"
-                className="group border border-slate-200 bg-slate-50 hover:bg-slate-100 rounded-2xl p-4 transition"
-              >
-                <span className="text-xl">🏫</span>
-                <h3 className="text-sm font-bold text-slate-800 mt-2 group-hover:text-slate-600">
-                  Portal Kesiswaan
-                </h3>
-                <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
-                  Akses layanan presensi, surat izin, jurnal kejadian, dan akun
-                  siswa sebagaimana tugas pegawai.
+            <section className="rounded-2xl border border-amber-200 bg-white p-5 shadow-sm sm:p-6">
+              <div className="flex items-start justify-between gap-3">
+                <div>
+                  <h2 className="text-sm font-bold text-slate-900">
+                    Administrasi Pengambilan Ijazah
+                  </h2>
+                  <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
+                    Kelola daftar pengambilan ijazah alumni dan persyaratan
+                    pengambilan di Tata Usaha.
+                  </p>
+                </div>
+                <span className="text-2xl" aria-hidden="true">
+                  🎓
+                </span>
+              </div>
+
+              <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50/70 p-4">
+                <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+                  Informasi Layanan
                 </p>
-              </Link>
-            </div>
-          </section>
+                <p className="mt-1 text-[11px] leading-relaxed text-amber-900">
+                  Persyaratan pengambilan ijazah ditampilkan di beranda publik
+                  dan dapat diperbarui melalui pengaturan layanan.
+                </p>
+              </div>
+              <p className="mt-4 text-[10px] text-slate-400">
+                Gunakan menu Pengaturan Akun untuk mengganti kata sandi staf.
+              </p>
+            </section>
+          </div>
+        )}
 
-          <section className="bg-white border border-slate-200 rounded-2xl shadow-sm p-5 sm:p-6">
+        {tabAktif === "Pengaturan Akun" && (
+          <section className="mx-auto max-w-lg rounded-2xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
             <h2 className="text-sm font-bold text-slate-900">
-              Ganti Kata Sandi
+              Ganti Kata Sandi Admin TU
             </h2>
-            <p className="text-[11px] text-slate-500 mt-1 leading-relaxed">
+            <p className="mt-1 text-[11px] leading-relaxed text-slate-500">
               Kata sandi bawaan Admin TU dapat diganti di sini. Minimal 6
               karakter.
             </p>
 
             {pesanSandi && (
-              <div className="mt-3 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-700 text-[11px] font-semibold">
+              <div className="mt-3 rounded-xl border border-emerald-200 bg-emerald-50 p-2.5 text-[11px] font-semibold text-emerald-700">
                 ✅ {pesanSandi}
               </div>
             )}
             {errorSandi && (
-              <div className="mt-3 p-2.5 rounded-xl bg-rose-50 border border-rose-200 text-rose-700 text-[11px] font-semibold">
+              <div className="mt-3 rounded-xl border border-rose-200 bg-rose-50 p-2.5 text-[11px] font-semibold text-rose-700">
                 ⛔ {errorSandi}
               </div>
             )}
 
             <form onSubmit={handleGantiSandi} className="mt-4 space-y-3 text-xs">
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
+                <label className="mb-1 block font-bold text-slate-700">
                   Kata Sandi Lama
                 </label>
                 <input
@@ -709,11 +770,11 @@ export default function AdminTuPage() {
                   required
                   value={sandiLama}
                   onChange={(e) => setSandiLama(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
+                <label className="mb-1 block font-bold text-slate-700">
                   Kata Sandi Baru
                 </label>
                 <input
@@ -722,11 +783,11 @@ export default function AdminTuPage() {
                   minLength={6}
                   value={sandiBaru}
                   onChange={(e) => setSandiBaru(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <div>
-                <label className="block font-bold text-slate-700 mb-1">
+                <label className="mb-1 block font-bold text-slate-700">
                   Konfirmasi Kata Sandi Baru
                 </label>
                 <input
@@ -735,19 +796,19 @@ export default function AdminTuPage() {
                   minLength={6}
                   value={konfirmasi}
                   onChange={(e) => setKonfirmasi(e.target.value)}
-                  className="w-full px-3.5 py-2.5 rounded-xl border border-slate-200 focus:outline-none focus:border-amber-500"
+                  className="w-full rounded-xl border border-slate-200 px-3.5 py-2.5 focus:border-amber-500 focus:outline-none"
                 />
               </div>
               <button
                 type="submit"
                 disabled={menyimpanSandi}
-                className="w-full py-2.5 bg-amber-600 hover:bg-amber-700 disabled:bg-amber-400 text-white font-bold rounded-xl transition"
+                className="w-full rounded-xl bg-amber-600 py-2.5 font-bold text-white transition hover:bg-amber-700 disabled:bg-amber-400"
               >
                 {menyimpanSandi ? "Menyimpan..." : "Simpan Kata Sandi"}
               </button>
             </form>
           </section>
-        </div>
+        )}
       </div>
       <NotifikasiWhatsAppFallback
         data={fallbackWa}

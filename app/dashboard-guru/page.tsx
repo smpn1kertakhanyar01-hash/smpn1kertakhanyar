@@ -517,7 +517,7 @@ export default function DashboardGuruPage() {
       }
 
       // Perbarui state dan localStorage lebih dulu agar keputusan langsung
-      // terlihat di Dashboard TU dan Status Izin Siswa, termasuk untuk
+      // terlihat di portal Tata Usaha dan Status Izin Siswa, termasuk untuk
       // pengajuan baru yang hanya tersimpan di browser (Vercel stateless).
       const itemSebelumnya = daftarIzin.find((item) => item.id === id);
       const waktuKeputusan = new Date().toLocaleDateString("id-ID");
