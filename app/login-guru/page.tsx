@@ -38,10 +38,21 @@ export default function LoginGuruPage() {
 
       simpanSesiGuru(user.nama, token, user.staffRole);
 
+      // RBAC: akun Tata Usaha mendapat "tu", guru/piket mendapat "guru".
+      const username = user.username.trim().toLowerCase();
+      const peran =
+        user.staffRole === "ADMIN_TU" ||
+        username === "petugas.smpn1kh" ||
+        username === "admintu"
+          ? "tu"
+          : "guru";
+      window.localStorage.setItem("SMPN1KH_USER_ROLE", peran);
+
       setTimeout(() => {
-        router.push("/dashboard-guru");
+        router.push(peran === "tu" ? "/admin-tu" : "/dashboard-guru");
       }, 200);
     } catch {
+      window.localStorage.removeItem("SMPN1KH_USER_ROLE");
       setLoading(false);
       setPesanError(
         "Akses ditolak! Periksa NIP/username dan kata sandi akun pegawai."

@@ -16,6 +16,8 @@ export const STORAGE_KEYS = {
   nisnSiswaLama: "siswaNisn",
   kelasSiswaLama: "siswaKelas",
   redirectSetelahLogin: "redirect_setelah_login",
+  // Peran akses panel pegawai: "guru" atau "tu" (RBAC sisi klien).
+  peranPenggunaLokal: "SMPN1KH_USER_ROLE",
   // Kunci penyimpanan lama, dipakai sekali saat migrasi data ke database.
   riwayatPresensi: "riwayat_presensi",
   daftarSuratIzin: "daftar_surat_izin",
@@ -129,6 +131,7 @@ export function hapusSesiSiswa(): void {
   [
     STORAGE_KEYS.isLoggedIn,
     STORAGE_KEYS.userRole,
+    STORAGE_KEYS.peranPenggunaLokal,
     STORAGE_KEYS.authToken,
     STORAGE_KEYS.namaSiswa,
     STORAGE_KEYS.nisnSiswa,
@@ -152,8 +155,44 @@ export function bacaPeranPegawai(): PeranPegawai | null {
     : null;
 }
 
+/** Peran akses panel pegawai yang dipakai untuk pembatasan hak akses. */
+export const PERAN_PENGGUNA_LOKAL_KEY = STORAGE_KEYS.peranPenggunaLokal;
+export type PeranPenggunaLokal = "guru" | "tu";
+
+export function simpanPeranPenggunaLokal(peran: PeranPenggunaLokal): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(PERAN_PENGGUNA_LOKAL_KEY, peran);
+}
+
+export function hapusPeranPenggunaLokal(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(PERAN_PENGGUNA_LOKAL_KEY);
+}
+
+/**
+ * Membaca peran RBAC. Sesi lama yang belum memiliki kunci baru otomatis
+ * dimigrasikan dari `peranPegawai === "ADMIN_TU"`.
+ */
+export function bacaPeranPenggunaLokal(): PeranPenggunaLokal | null {
+  if (typeof window === "undefined") return null;
+
+  try {
+    const nilai = window.localStorage.getItem(PERAN_PENGGUNA_LOKAL_KEY);
+    if (nilai === "guru" || nilai === "tu") return nilai;
+
+    if (window.localStorage.getItem(STORAGE_KEYS.peranPegawai) === "ADMIN_TU") {
+      simpanPeranPenggunaLokal("tu");
+      return "tu";
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export function apakahAdminTu(): boolean {
-  return bacaPeranPegawai() === "ADMIN_TU";
+  return bacaPeranPenggunaLokal() === "tu";
 }
 
 export function simpanSesiGuru(
@@ -175,5 +214,6 @@ export function hapusSesiGuru(): void {
     STORAGE_KEYS.authToken,
     STORAGE_KEYS.namaGuru,
     STORAGE_KEYS.peranPegawai,
+    STORAGE_KEYS.peranPenggunaLokal,
   ].forEach((key) => window.localStorage.removeItem(key));
 }

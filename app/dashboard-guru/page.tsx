@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
-import ImporDataSiswa from "@/components/ImporDataSiswa";
 import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
@@ -44,7 +43,7 @@ import {
 } from "@/lib/siswa-store";
 import {
   apakahLogin,
-  bacaPeranPegawai,
+  bacaPeranPenggunaLokal,
   hapusSesiGuru,
   STORAGE_KEYS,
 } from "@/lib/storage";
@@ -55,7 +54,6 @@ import type {
   MutasiSiswa,
   PengambilanIjazah,
   PengaturanLayanan,
-  PeranPegawai,
   PresensiItem,
   SuratIzinItem,
 } from "@/lib/types";
@@ -209,7 +207,7 @@ export default function DashboardGuruPage() {
   const [sandiTerlihat, setSandiTerlihat] = useState<Record<number, boolean>>({});
   const [resetLoading, setResetLoading] = useState<string | null>(null);
   const [modalFoto, setModalFoto] = useState<string | null>(null);
-  const [peranPegawai, setPeranPegawai] = useState<PeranPegawai | null>(null);
+  const [peranLokal, setPeranLokal] = useState<"guru" | "tu" | null>(null);
   const [pesanAkses, setPesanAkses] = useState("");
   const [namaPegawai, setNamaPegawai] = useState("");
 
@@ -262,7 +260,7 @@ export default function DashboardGuruPage() {
     const parameter = new URLSearchParams(window.location.search);
     if (parameter.get("akses") === "ditolak") {
       setPesanAkses(
-        "Akses Khusus Tata Usaha. Menu Mutasi Siswa hanya dapat dibuka oleh staf Admin TU."
+        "Akses ditolak. Dashboard Tata Usaha hanya dapat dibuka oleh akun TU."
       );
     }
 
@@ -275,9 +273,10 @@ export default function DashboardGuruPage() {
       return;
     }
 
-    const peran = bacaPeranPegawai() ?? "GURU_PIKET";
-    const adminTu = peran === "ADMIN_TU";
-    setPeranPegawai(peran);
+    // Hak akses diambil dari peran RBAC yang disimpan saat login.
+    const peran = bacaPeranPenggunaLokal();
+    setPeranLokal(peran);
+    const adminTu = peran === "tu";
 
     // Nama guru default untuk form kejadian
     const namaGuruLogin =
@@ -1059,7 +1058,7 @@ Terima kasih.`;
         )
       : true
   );
-  const isAdminTu = peranPegawai === "ADMIN_TU";
+  const isAdminTu = peranLokal === "tu";
 
   const izinMenunggu = daftarIzin.filter((item) =>
     item.status.toLowerCase().includes("menunggu")
@@ -1185,14 +1184,6 @@ Terima kasih.`;
         badgeClassName="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center"
       >
         <div className="flex items-center gap-3">
-          {isAdminTu && (
-            <Link
-              href="/admin-tu"
-              className="text-xs bg-amber-50 hover:bg-amber-100 text-amber-700 border border-amber-200 font-semibold px-3 py-1.5 rounded-lg transition"
-            >
-              Dashboard TU
-            </Link>
-          )}
           <Link
             href="/"
             className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
@@ -1912,29 +1903,19 @@ Terima kasih.`;
                   Data Akun Siswa & Riwayat Sandi
                 </h2>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Data siswa aktif beserta sandi. Impor data PPDB baru dari CSV.
+                  Data siswa aktif beserta sandi untuk keperluan bantuan akun.
                 </p>
               </div>
-              <div className="flex flex-col items-stretch gap-2 sm:items-end">
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[11px] text-slate-400">
-                    {daftarAkun.length} akun siswa
-                  </span>
-                  <input
-                    type="search"
-                    value={pencarianAkun}
-                    onChange={(e) => setPencarianAkun(e.target.value)}
-                    placeholder="Cari NISN, nama, atau kelas..."
-                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-56"
-                  />
-                </div>
-                <ImporDataSiswa
-                  daftarSiswaSaatIni={daftarAkun}
-                  onSelesaiImpor={() =>
-                    setDaftarAkun((sebelumnya) =>
-                      gabungkanAkunSiswaLokal(sebelumnya)
-                    )
-                  }
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] text-slate-400">
+                  {daftarAkun.length} akun siswa
+                </span>
+                <input
+                  type="search"
+                  value={pencarianAkun}
+                  onChange={(e) => setPencarianAkun(e.target.value)}
+                  placeholder="Cari NISN, nama, atau kelas..."
+                  className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-56"
                 />
               </div>
             </div>

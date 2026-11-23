@@ -28,7 +28,9 @@ import {
   apakahAdminTu,
   apakahLogin,
   bacaNamaGuru,
+  bacaPeranPenggunaLokal,
   hapusSesiGuru,
+  PERAN_PENGGUNA_LOKAL_KEY,
 } from "@/lib/storage";
 import type { MutasiSiswa, SuratIzinItem } from "@/lib/types";
 
@@ -53,7 +55,15 @@ export default function AdminTuPage() {
   const [menyimpanSandi, setMenyimpanSandi] = useState(false);
 
   useEffect(() => {
-    if (!apakahLogin("guru") || !apakahAdminTu()) {
+    // Migrasi sesi lama yang belum menyimpan kunci peran baru.
+    bacaPeranPenggunaLokal();
+    const peranLokal = window.localStorage.getItem(PERAN_PENGGUNA_LOKAL_KEY);
+
+    if (
+      peranLokal !== "tu" ||
+      !apakahLogin("guru") ||
+      !apakahAdminTu()
+    ) {
       router.replace("/dashboard-guru?akses=ditolak");
       return;
     }
@@ -102,7 +112,12 @@ export default function AdminTuPage() {
   // Sinkronkan keputusan izin dengan Dashboard Guru dan portal siswa.
   useEffect(() => {
     const berhenti = berlanggananPerubahanIzin(() => {
-      if (!apakahLogin("guru") || !apakahAdminTu()) return;
+      if (
+        window.localStorage.getItem(PERAN_PENGGUNA_LOKAL_KEY) !== "tu" ||
+        !apakahLogin("guru") ||
+        !apakahAdminTu()
+      )
+        return;
       setDaftarIzin(ambilDaftarIzinLengkap());
     });
     return berhenti;

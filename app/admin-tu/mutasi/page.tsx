@@ -8,7 +8,9 @@ import { api } from "@/lib/api-client";
 import {
   apakahAdminTu,
   apakahLogin,
+  bacaPeranPenggunaLokal,
   hapusSesiGuru,
+  PERAN_PENGGUNA_LOKAL_KEY,
 } from "@/lib/storage";
 import type { MutasiSiswa } from "@/lib/types";
 
@@ -86,7 +88,14 @@ export default function AdminTuMutasiPage() {
   } | null>(null);
 
   useEffect(() => {
-    if (!apakahLogin("guru") || !apakahAdminTu()) {
+    bacaPeranPenggunaLokal();
+    const peranLokal = window.localStorage.getItem(PERAN_PENGGUNA_LOKAL_KEY);
+
+    if (
+      peranLokal !== "tu" ||
+      !apakahLogin("guru") ||
+      !apakahAdminTu()
+    ) {
       router.replace("/dashboard-guru?akses=ditolak");
       return;
     }
