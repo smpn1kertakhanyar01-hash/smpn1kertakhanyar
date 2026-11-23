@@ -27,21 +27,51 @@ interface ApiError {
   error?: string;
 }
 
-async function permintaan<T>(url: string, init?: RequestInit): Promise<T> {
+/**
+ * Batas waktu permintaan API. Serverless Vercel dapat menggantung saat
+ * menulis SQLite read-only atau mengirim WhatsApp, jadi permintaan dibatalkan
+ * agar UI tidak macet dan fallback lokal tetap berjalan.
+ */
+const BATAS_WAKTU_PERMINTAAN_MS = 10_000;
+
+async function permintaan<T>(
+  url: string,
+  init?: RequestInit,
+  batasWaktuMs = BATAS_WAKTU_PERMINTAAN_MS
+): Promise<T> {
   const token =
     typeof window !== "undefined"
       ? window.localStorage.getItem(STORAGE_KEYS.authToken)
       : null;
 
-  const response = await fetch(url, {
-    ...init,
-    cache: "no-store",
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...(init?.headers ?? {}),
-    },
-  });
+  const pengendali =
+    typeof AbortController !== "undefined" ? new AbortController() : null;
+  const timer = pengendali
+    ? setTimeout(() => pengendali.abort(), batasWaktuMs)
+    : null;
+
+  let response: Response;
+  try {
+    response = await fetch(url, {
+      ...init,
+      cache: "no-store",
+      signal: pengendali?.signal ?? init?.signal,
+      headers: {
+        "Content-Type": "application/json",
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
+        ...(init?.headers ?? {}),
+      },
+    });
+  } catch (error) {
+    if (error instanceof Error && error.name === "AbortError") {
+      throw new Error(
+        "Server tidak merespons tepat waktu. Data tetap tersimpan di perangkat ini."
+      );
+    }
+    throw error;
+  } finally {
+    if (timer) clearTimeout(timer);
+  }
 
   if (!response.ok) {
     let pesan = "Terjadi kesalahan saat menghubungi server.";

@@ -4,7 +4,11 @@ import {
   getKalenderAkademikById,
   updateKalenderAkademik,
 } from "@/lib/db-kesiswaan";
-import type { KategoriKalender } from "@/lib/types";
+import {
+  responsBerhasilLokal,
+  responsTersimpanLokal,
+} from "@/lib/api-fallback";
+import type { KalenderAkademik, KategoriKalender } from "@/lib/types";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
@@ -14,9 +18,19 @@ const KATEGORI_VALID: KategoriKalender[] = ["Ujian", "Libur", "Kegiatan"];
 const POLA_TANGGAL = /^\d{4}-\d{2}-\d{2}$/;
 
 export async function PATCH(request: Request, context: RouteContext) {
+  let nomorId = 0;
+  let lama: KalenderAkademik | null = null;
+  let body: {
+    judulKegiatan?: string;
+    deskripsi?: string | null;
+    tanggalMulai?: string;
+    tanggalSelesai?: string;
+    kategori?: string;
+  } = {};
+
   try {
     const { id } = await context.params;
-    const nomorId = Number(id);
+    nomorId = Number(id);
     if (!Number.isInteger(nomorId) || nomorId <= 0) {
       return NextResponse.json(
         { error: "ID kalender tidak valid." },
@@ -24,7 +38,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const lama = getKalenderAkademikById(nomorId);
+    lama = getKalenderAkademikById(nomorId);
     if (!lama) {
       return NextResponse.json(
         { error: "Kegiatan kalender tidak ditemukan." },
@@ -32,13 +46,7 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    const body = (await request.json()) as {
-      judulKegiatan?: string;
-      deskripsi?: string | null;
-      tanggalMulai?: string;
-      tanggalSelesai?: string;
-      kategori?: string;
-    };
+    body = (await request.json()) as typeof body;
 
     const judulKegiatan =
       body.judulKegiatan === undefined
@@ -95,9 +103,36 @@ export async function PATCH(request: Request, context: RouteContext) {
     return NextResponse.json(hasil);
   } catch (error) {
     console.error("Gagal memperbarui kalender akademik:", error);
-    return NextResponse.json(
-      { error: "Gagal memperbarui kalender akademik." },
-      { status: 500 }
+    const dasar: KalenderAkademik = lama ?? {
+      id: nomorId > 0 ? nomorId : Date.now(),
+      judulKegiatan: "",
+      deskripsi: null,
+      tanggalMulai: body.tanggalMulai ?? "",
+      tanggalSelesai: body.tanggalSelesai ?? "",
+      kategori: (body.kategori ?? "Kegiatan") as KategoriKalender,
+      createdAt: new Date().toISOString(),
+    };
+
+    return responsTersimpanLokal(
+      {
+        ...dasar,
+        ...(body.judulKegiatan !== undefined
+          ? { judulKegiatan: body.judulKegiatan }
+          : {}),
+        ...(body.deskripsi !== undefined
+          ? { deskripsi: body.deskripsi?.trim() || null }
+          : {}),
+        ...(body.tanggalMulai !== undefined
+          ? { tanggalMulai: body.tanggalMulai }
+          : {}),
+        ...(body.tanggalSelesai !== undefined
+          ? { tanggalSelesai: body.tanggalSelesai }
+          : {}),
+        ...(body.kategori !== undefined
+          ? { kategori: body.kategori as KategoriKalender }
+          : {}),
+      },
+      "Perubahan kalender tersimpan di perangkat pengguna."
     );
   }
 }
@@ -114,18 +149,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     if (!deleteKalenderAkademik(nomorId)) {
-      return NextResponse.json(
-        { error: "Kegiatan kalender tidak ditemukan." },
-        { status: 404 }
-      );
+      // Idempoten: data mungkin hanya ada di browser pengguna.
+      return responsBerhasilLokal("Kegiatan kalender sudah tidak tersedia.");
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, success: true });
   } catch (error) {
     console.error("Gagal menghapus kalender akademik:", error);
-    return NextResponse.json(
-      { error: "Gagal menghapus kalender akademik." },
-      { status: 500 }
+    return responsBerhasilLokal(
+      "Penghapusan kalender diterapkan di perangkat pengguna."
     );
   }
 }

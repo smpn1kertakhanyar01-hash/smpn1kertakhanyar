@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { responsTersimpanLokal } from "@/lib/api-fallback";
 import {
   createKalenderAkademik,
   getKalenderAkademik,
@@ -27,22 +28,22 @@ export async function GET(request: Request) {
     );
   } catch (error) {
     console.error("Gagal membaca kalender akademik:", error);
-    return NextResponse.json(
-      { error: "Gagal membaca kalender akademik." },
-      { status: 500 }
-    );
+    // SQLite Vercel read-only: balas array kosong agar halaman tetap tampil.
+    return NextResponse.json([]);
   }
 }
 
 export async function POST(request: Request) {
+  let body: {
+    judulKegiatan?: string;
+    deskripsi?: string | null;
+    tanggalMulai?: string;
+    tanggalSelesai?: string;
+    kategori?: string;
+  } = {};
+
   try {
-    const body = (await request.json()) as {
-      judulKegiatan?: string;
-      deskripsi?: string | null;
-      tanggalMulai?: string;
-      tanggalSelesai?: string;
-      kategori?: string;
-    };
+    body = (await request.json()) as typeof body;
 
     const judulKegiatan = body.judulKegiatan?.trim();
     const tanggalMulai = body.tanggalMulai?.trim();
@@ -93,9 +94,17 @@ export async function POST(request: Request) {
     return NextResponse.json(tersimpan, { status: 201 });
   } catch (error) {
     console.error("Gagal menyimpan kalender akademik:", error);
-    return NextResponse.json(
-      { error: "Gagal menyimpan kalender akademik." },
-      { status: 500 }
+    return responsTersimpanLokal(
+      {
+        id: Date.now(),
+        judulKegiatan: body.judulKegiatan?.trim() ?? "",
+        deskripsi: body.deskripsi?.trim() || null,
+        tanggalMulai: body.tanggalMulai?.trim() ?? "",
+        tanggalSelesai: body.tanggalSelesai?.trim() ?? "",
+        kategori: (body.kategori ?? "Kegiatan") as KategoriKalender,
+        createdAt: new Date().toISOString(),
+      },
+      "Kegiatan kalender tersimpan di perangkat pengguna."
     );
   }
 }

@@ -8,6 +8,10 @@ import { api } from "@/lib/api-client";
 import { STATUS_PRESENSI } from "@/lib/constants";
 import { daftarSiswaFallback, normalisasiKelasSiswa } from "@/lib/data";
 import { bacaPresensiLokal, simpanPresensiLokal } from "@/lib/presensi-store";
+import {
+  berlanggananPerubahanSiswa,
+  gabungkanSiswaLokal,
+} from "@/lib/siswa-store";
 import type { CatatanAbsen, Siswa, StatusPresensi } from "@/lib/types";
 import { ambilTanggalHariIni, ambilWaktuSekarang } from "@/lib/utils";
 
@@ -41,7 +45,10 @@ export default function PresensiKelasPage() {
           ...siswa,
           kelas: normalisasiKelasSiswa(siswa.kelas),
         }));
-        const tampil = dataSiswa.length > 0 ? dataSiswa : daftarSiswaFallback();
+        // Sertakan siswa hasil impor PPDB yang tersimpan di browser.
+        const tampil = gabungkanSiswaLokal(
+          dataSiswa.length > 0 ? dataSiswa : daftarSiswaFallback()
+        );
         setDaftarSiswa(tampil);
 
         // Default kelas pertama adalah 9A; jika tidak ada, pakai kelas
@@ -58,7 +65,7 @@ export default function PresensiKelasPage() {
         if (!masihAktif) return;
         console.error("Gagal memuat data siswa, memakai data fallback:", error);
         // Tetap tampilkan 63 siswa asli saat API/SQLite Vercel tidak terbaca.
-        setDaftarSiswa(daftarSiswaFallback());
+        setDaftarSiswa(gabungkanSiswaLokal(daftarSiswaFallback()));
         setKelasTerpilih((sebelumnya) =>
           sebelumnya === "9A" || sebelumnya === "9B" ? sebelumnya : "9A"
         );
@@ -67,6 +74,13 @@ export default function PresensiKelasPage() {
     return () => {
       masihAktif = false;
     };
+  }, []);
+
+  // Siswa baru hasil impor langsung muncul pada pilihan kelas & daftar absen.
+  useEffect(() => {
+    return berlanggananPerubahanSiswa(() => {
+      setDaftarSiswa((sebelumnya) => gabungkanSiswaLokal(sebelumnya));
+    });
   }, []);
 
   const siswaPerKelas = useMemo(

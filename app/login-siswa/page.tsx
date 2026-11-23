@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import Logo from "@/components/Logo";
 import { NOMOR_WHATSAPP } from "@/lib/constants";
+import { cariSiswaLokalUntukLogin } from "@/lib/siswa-store";
 import { simpanSesiSiswa, STORAGE_KEYS } from "@/lib/storage";
 import type { Pengguna } from "@/lib/types";
 
@@ -59,39 +60,58 @@ export default function LoginSiswaPage() {
   const [namaBantuan, setNamaBantuan] = useState<string>("");
   const [nisnBantuan, setNisnBantuan] = useState<string>("");
 
+  const selesaikanLogin = (user: Pengguna, token: string) => {
+    // 1. Simpan sesi otentikasi siswa
+    simpanSesiSiswa({
+      nama: user.nama,
+      nisn: user.nisn ?? "",
+      kelas: user.kelas ?? "",
+      token,
+    });
+
+    // 2. Baca halaman target yang tadi diklik (Surat Izin / Jurnal Kejadian)
+    const targetRedirect = sessionStorage.getItem(
+      STORAGE_KEYS.redirectSetelahLogin
+    );
+    const tujuan =
+      targetRedirect && targetRedirect.startsWith("/") ? targetRedirect : "/";
+
+    // Hapus jejak setelah dibaca agar tidak mengganggu login berikutnya.
+    sessionStorage.removeItem(STORAGE_KEYS.redirectSetelahLogin);
+
+    // 3. Alihkan ke halaman target, atau kembali ke beranda.
+    router.replace(tujuan);
+  };
+
   const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setLoading(true);
     setPesanError("");
+
+    // Siswa hasil impor PPDB hanya dikenal di browser (SQLite Vercel
+    // read-only), jadi kredensialnya diverifikasi lebih dulu dari localStorage.
+    const siswaLokal = cariSiswaLokalUntukLogin(nisn.trim(), password.trim());
+    if (siswaLokal) {
+      selesaikanLogin(
+        {
+          id: -Date.now(),
+          username: siswaLokal.nisn,
+          role: "siswa",
+          nama: siswaLokal.nama,
+          nisn: siswaLokal.nisn,
+          kelas: siswaLokal.kelas,
+        },
+        `smpn1-lokal.${btoa(encodeURIComponent(`${siswaLokal.nisn}:${Date.now()}`))}`
+      );
+      return;
+    }
 
     try {
       const { user, token } = await verifikasiLoginSiswa(
         nisn.trim(),
         password.trim()
       );
-
-      // 1. Simpan sesi otentikasi siswa
-      simpanSesiSiswa({
-        nama: user.nama,
-        nisn: user.nisn ?? "",
-        kelas: user.kelas ?? "",
-        token,
-      });
-
-      // 2. Baca halaman target yang tadi diklik (Surat Izin / Jurnal Kejadian)
-      const targetRedirect = sessionStorage.getItem(
-        STORAGE_KEYS.redirectSetelahLogin
-      );
-      const tujuan =
-        targetRedirect && targetRedirect.startsWith("/")
-          ? targetRedirect
-          : "/";
-
-      // Hapus jejak setelah dibaca agar tidak mengganggu login berikutnya.
-      sessionStorage.removeItem(STORAGE_KEYS.redirectSetelahLogin);
-
-      // 3. Alihkan ke halaman target, atau kembali ke beranda.
-      router.replace(tujuan);
+      selesaikanLogin(user, token);
     } catch (error) {
       setLoading(false);
       if (error instanceof TypeError) {

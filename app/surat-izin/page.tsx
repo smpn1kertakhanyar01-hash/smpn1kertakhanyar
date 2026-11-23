@@ -11,6 +11,10 @@ import {
   simpanPengajuanIzinBaru,
 } from "@/lib/izin-store";
 import {
+  berlanggananPerubahanSiswa,
+  daftarKelasSiswaLokal,
+} from "@/lib/siswa-store";
+import {
   bacaSesiSiswa,
   hapusSesiSiswa,
   STORAGE_KEYS,
@@ -40,6 +44,9 @@ export default function SuratIzinSiswaPage() {
 
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [submittedData, setSubmittedData] = useState<{ id?: number; noReg?: string } | null>(null);
+  const [pilihanKelas, setPilihanKelas] = useState<string[]>([
+    ...KELAS_PENDAFTARAN,
+  ]);
 
   useEffect(() => {
     const loggedIn = localStorage.getItem(STORAGE_KEYS.isLoggedIn);
@@ -59,6 +66,26 @@ export default function SuratIzinSiswaPage() {
       kelas: sesi.kelas || "VII A",
     }));
   }, [router]);
+
+  // Kelas hasil impor PPDB ikut menjadi pilihan agar siswa baru dapat
+  // mengajukan surat izin dengan kelas yang sesuai.
+  useEffect(() => {
+    const muat = () => {
+      const kelasSesi = bacaSesiSiswa().kelas;
+      setPilihanKelas(
+        Array.from(
+          new Set([
+            ...KELAS_PENDAFTARAN,
+            ...(kelasSesi ? [kelasSesi] : []),
+            ...daftarKelasSiswaLokal(),
+          ])
+        )
+      );
+    };
+
+    muat();
+    return berlanggananPerubahanSiswa(muat);
+  }, []);
 
   // Fungsi Kompresi Foto Otomatis (Maksimal lebar 800px & Kualitas 0.6)
   const handleUploadFoto = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -352,7 +379,7 @@ export default function SuratIzinSiswaPage() {
                     onChange={(e) => setFormData({ ...formData, kelas: e.target.value })}
                     className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
                   >
-                    {KELAS_PENDAFTARAN.map((kelas) => (
+                    {pilihanKelas.map((kelas) => (
                       <option key={kelas} value={kelas}>
                         Kelas {kelas}
                       </option>

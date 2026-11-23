@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import ImporDataSiswa from "@/components/ImporDataSiswa";
 import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
@@ -37,6 +38,11 @@ import {
   gabungPresensi,
 } from "@/lib/presensi-store";
 import {
+  berlanggananPerubahanSiswa,
+  daftarKelasSiswaLokal,
+  gabungkanAkunSiswaLokal,
+} from "@/lib/siswa-store";
+import {
   apakahLogin,
   bacaPeranPegawai,
   hapusSesiGuru,
@@ -56,6 +62,7 @@ import type {
 import {
   buatUrlWhatsApp,
   buatUrlWhatsAppDenganPesan,
+  kirimDenganBatasWaktu,
 } from "@/lib/utils";
 
 /**
@@ -198,6 +205,7 @@ export default function DashboardGuruPage() {
   const [memprosesMutasi, setMemprosesMutasi] = useState<number | null>(null);
   const [daftarAkun, setDaftarAkun] = useState<AkunSandiSiswa[]>([]);
   const [memuatAkun, setMemuatAkun] = useState<boolean>(true);
+  const [pencarianAkun, setPencarianAkun] = useState("");
   const [sandiTerlihat, setSandiTerlihat] = useState<Record<number, boolean>>({});
   const [resetLoading, setResetLoading] = useState<string | null>(null);
   const [modalFoto, setModalFoto] = useState<string | null>(null);
@@ -240,6 +248,9 @@ export default function DashboardGuruPage() {
 
   // Filter Presensi
   const [filterKelas, setFilterKelas] = useState<string>("Semua");
+  const [pilihanKelasPresensi, setPilihanKelasPresensi] = useState<string[]>([
+    ...KELAS_REKAP_PRESENSI,
+  ]);
 
   // Statistik Pengunjung
   const [pengunjungHariIni, setPengunjungHariIni] = useState(0);
@@ -358,11 +369,15 @@ export default function DashboardGuruPage() {
 
       try {
         const akun = await api.getStudentAccounts();
-        if (masihAktif) setDaftarAkun(akun);
+        if (masihAktif) setDaftarAkun(gabungkanAkunSiswaLokal(akun));
       } catch (error) {
         console.error("Gagal memuat akun siswa:", error);
         // Tetap tampilkan 63 data siswa asli saat database Vercel tidak terbaca.
-        if (masihAktif) setDaftarAkun(daftarAkunSandiSiswaFallback());
+        if (masihAktif) {
+          setDaftarAkun(
+            gabungkanAkunSiswaLokal(daftarAkunSandiSiswaFallback())
+          );
+        }
       } finally {
         if (masihAktif) {
           setMemuatAkun(false);
@@ -426,6 +441,21 @@ export default function DashboardGuruPage() {
       setDaftarKejadian(ambilJurnalLengkap());
     });
     return berhenti;
+  }, []);
+
+  // Siswa hasil impor PPDB langsung tampil di Backup Sandi Siswa dan filter
+  // kelas presensi tanpa perlu menunggu server database.
+  useEffect(() => {
+    const muat = () => {
+      if (!apakahLogin("guru")) return;
+      setDaftarAkun((sebelumnya) => gabungkanAkunSiswaLokal(sebelumnya));
+      setPilihanKelasPresensi(
+        Array.from(new Set([...KELAS_REKAP_PRESENSI, ...daftarKelasSiswaLokal()]))
+      );
+    };
+
+    muat();
+    return berlanggananPerubahanSiswa(muat);
   }, []);
 
   const handleLogout = async () => {
@@ -572,23 +602,28 @@ Terima kasih.`;
 
           if (nomorWali) {
             try {
-              const response = await fetch("/api/notifikasi-wa", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                  nomorWa: nomorWali,
-                  namaSiswa: izinTerbaru.nama,
-                  kelas: izinTerbaru.kelas,
-                  noReg,
-                  pesan,
-                }),
-              });
-              const data = (await response.json().catch(() => ({}))) as {
-                ok?: boolean;
-                error?: string;
-              };
+              const response = await kirimDenganBatasWaktu(
+                "/api/notifikasi-wa",
+                {
+                  method: "POST",
+                  headers: { "Content-Type": "application/json" },
+                  body: JSON.stringify({
+                    nomorWa: nomorWali,
+                    namaSiswa: izinTerbaru.nama,
+                    kelas: izinTerbaru.kelas,
+                    noReg,
+                    pesan,
+                  }),
+                }
+              );
+              const data = response
+                ? ((await response.json().catch(() => ({}))) as {
+                    ok?: boolean;
+                    error?: string;
+                  })
+                : {};
 
-              if (!response.ok || data.ok === false) {
+              if (!response || !response.ok || data.ok === false) {
                 setFallbackWa({
                   terkirim: false,
                   waUrl: buatUrlWhatsAppDenganPesan(nomorWali, pesan),
@@ -917,7 +952,9 @@ Terima kasih.`;
         petugas: namaPegawai || "Admin TU",
       });
       setDaftarIjazah((prev) =>
-        prev.map((ijazah) => (ijazah.id === item.id ? hasil : ijazah))
+        prev.map((ijazah) =>
+          ijazah.id === item.id ? { ...ijazah, ...hasil } : ijazah
+        )
       );
     } catch (error) {
       alert(
@@ -943,7 +980,9 @@ Terima kasih.`;
         diambilOleh: null,
       });
       setDaftarIjazah((prev) =>
-        prev.map((ijazah) => (ijazah.id === item.id ? hasil : ijazah))
+        prev.map((ijazah) =>
+          ijazah.id === item.id ? { ...ijazah, ...hasil } : ijazah
+        )
       );
     } catch (error) {
       alert(
@@ -1012,6 +1051,14 @@ Terima kasih.`;
       : daftarPresensi.filter((item) => item.kelas === filterKelas);
 
   const petaAkunSiswa = new Map(daftarAkun.map((akun) => [akun.id, akun]));
+  const kunciPencarianAkun = pencarianAkun.trim().toLowerCase();
+  const akunTampil = daftarAkun.filter((akun) =>
+    kunciPencarianAkun
+      ? [akun.nisn, akun.nama, akun.kelas].some((nilai) =>
+          nilai.toLowerCase().includes(kunciPencarianAkun)
+        )
+      : true
+  );
   const isAdminTu = peranPegawai === "ADMIN_TU";
 
   const izinMenunggu = daftarIzin.filter((item) =>
@@ -1377,7 +1424,7 @@ Terima kasih.`;
                   className="bg-white border border-slate-200 rounded-xl px-3 py-1.5 text-xs font-semibold text-slate-700 focus:outline-none focus:border-blue-600"
                 >
                   <option value="Semua">Semua Kelas</option>
-                  {KELAS_REKAP_PRESENSI.map((kelas) => (
+                  {pilihanKelasPresensi.map((kelas) => (
                     <option key={kelas} value={kelas}>
                       Kelas {kelas}
                     </option>
@@ -1859,18 +1906,37 @@ Terima kasih.`;
         {/* TAB 5: DATA AKUN SISWA & RIWAYAT SANDI */}
         {tabAktif === "akun" && (
           <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-            <div className="p-4 border-b border-slate-100 bg-slate-50/50 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+            <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h2 className="text-xs font-bold text-slate-700 uppercase">
                   Data Akun Siswa & Riwayat Sandi
                 </h2>
                 <p className="text-[10px] text-slate-400 mt-0.5">
-                  Khusus guru piket/BK untuk bantuan reset akun siswa.
+                  Data siswa aktif beserta sandi. Impor data PPDB baru dari CSV.
                 </p>
               </div>
-              <span className="text-[11px] text-slate-400">
-                {daftarAkun.length} akun siswa
-              </span>
+              <div className="flex flex-col items-stretch gap-2 sm:items-end">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] text-slate-400">
+                    {daftarAkun.length} akun siswa
+                  </span>
+                  <input
+                    type="search"
+                    value={pencarianAkun}
+                    onChange={(e) => setPencarianAkun(e.target.value)}
+                    placeholder="Cari NISN, nama, atau kelas..."
+                    className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-56"
+                  />
+                </div>
+                <ImporDataSiswa
+                  daftarSiswaSaatIni={daftarAkun}
+                  onSelesaiImpor={() =>
+                    setDaftarAkun((sebelumnya) =>
+                      gabungkanAkunSiswaLokal(sebelumnya)
+                    )
+                  }
+                />
+              </div>
             </div>
 
             <div className="m-4 p-3 rounded-xl bg-amber-50 border border-amber-200 text-[11px] text-amber-800 leading-relaxed">
@@ -1882,9 +1948,11 @@ Terima kasih.`;
               <p className="p-10 text-center text-xs text-slate-400">
                 Memuat data akun siswa...
               </p>
-            ) : daftarAkun.length === 0 ? (
+            ) : akunTampil.length === 0 ? (
               <p className="p-10 text-center text-xs text-slate-400">
-                Belum ada akun siswa yang terdaftar.
+                {daftarAkun.length === 0
+                  ? "Belum ada akun siswa yang terdaftar."
+                  : "Tidak ada akun siswa yang cocok dengan pencarian."}
               </p>
             ) : (
               <div className="overflow-x-auto">
@@ -1900,7 +1968,7 @@ Terima kasih.`;
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-100">
-                    {daftarAkun.map((item) => (
+                    {akunTampil.map((item) => (
                       <tr key={item.id} className="hover:bg-slate-50/70 transition">
                         <td className="p-3 font-mono text-slate-700 whitespace-nowrap">
                           {item.nisn}

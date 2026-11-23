@@ -111,6 +111,36 @@ function ambilTingkatKelas(kelas?: string | null): string {
 }
 
 /**
+ * Kirim permintaan HTTP dengan batas waktu. Dipakai untuk panggilan yang
+ * berpotensi menggantung (mis. WhatsApp gateway) agar UI tidak macet menunggu.
+ * Mengembalikan `null` bila jaringan gagal atau waktu habis.
+ */
+export async function kirimDenganBatasWaktu(
+  input: RequestInfo | URL,
+  init?: RequestInit,
+  batasMs = 6000
+): Promise<Response | null> {
+  if (typeof AbortController === "undefined") {
+    try {
+      return await fetch(input, init);
+    } catch {
+      return null;
+    }
+  }
+
+  const pengendali = new AbortController();
+  const timer = setTimeout(() => pengendali.abort(), batasMs);
+
+  try {
+    return await fetch(input, { ...init, signal: pengendali.signal });
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+/**
  * Menyamarkan identitas siswa untuk tampilan publik/portal siswa.
  * Nama menjadi inisial (contoh: "Ahmad Fauzi" -> "A.F.") dan
  * kelas hanya menampilkan tingkat tanpa paralel (contoh: "IX A" -> "Kelas IX (Paralel Disamarkan)").

@@ -7,9 +7,7 @@ export async function GET() {
     return NextResponse.json(getAgenda());
   } catch (error) {
     console.error("Gagal membaca agenda akademik:", error);
-    return NextResponse.json(
-      { error: "Gagal membaca agenda akademik." },
-      { status: 500 }
-    );
+    // Jangan blokir halaman karena SQLite Vercel read-only.
+    return NextResponse.json([]);
   }
 }

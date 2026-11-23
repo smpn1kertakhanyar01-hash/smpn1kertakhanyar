@@ -4,10 +4,12 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
+import ImporDataSiswa from "@/components/ImporDataSiswa";
 import NotifikasiWhatsAppFallback, {
   type DataFallbackWhatsApp,
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
+import { daftarSiswaFallback } from "@/lib/data";
 import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
   ambilDaftarIzinLengkap,
@@ -17,6 +19,11 @@ import {
   simpanOverrideIzin,
   terapkanOverrideIzin,
 } from "@/lib/izin-store";
+import {
+  berlanggananPerubahanSiswa,
+  gabungkanSiswaLokalLengkap,
+  type SiswaLokal,
+} from "@/lib/siswa-store";
 import {
   apakahAdminTu,
   apakahLogin,
@@ -31,6 +38,8 @@ export default function AdminTuPage() {
   const [nama, setNama] = useState("");
   const [daftarMutasi, setDaftarMutasi] = useState<MutasiSiswa[]>([]);
   const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
+  const [daftarSiswa, setDaftarSiswa] = useState<SiswaLokal[]>([]);
+  const [pencarianSiswa, setPencarianSiswa] = useState("");
   const [memuat, setMemuat] = useState(true);
   const [memprosesIzin, setMemprosesIzin] = useState<number | null>(null);
   const [fallbackWa, setFallbackWa] =
@@ -62,6 +71,16 @@ export default function AdminTuPage() {
       }
 
       try {
+        const siswa = await api.getStudents();
+        if (masihAktif) setDaftarSiswa(gabungkanSiswaLokalLengkap(siswa));
+      } catch (error) {
+        console.error("Gagal memuat daftar siswa:", error);
+        if (masihAktif) {
+          setDaftarSiswa(gabungkanSiswaLokalLengkap(daftarSiswaFallback()));
+        }
+      }
+
+      try {
         const izin = await api.getLeaveRequests();
         if (masihAktif) setDaftarIzin(ambilDaftarIzinLengkap(izin));
       } catch (error) {
@@ -87,6 +106,15 @@ export default function AdminTuPage() {
       setDaftarIzin(ambilDaftarIzinLengkap());
     });
     return berhenti;
+  }, []);
+
+  // Siswa hasil impor PPDB langsung tampil walau diinput dari tab lain.
+  useEffect(() => {
+    return berlanggananPerubahanSiswa(() => {
+      setDaftarSiswa((sebelumnya) =>
+        gabungkanSiswaLokalLengkap(sebelumnya)
+      );
+    });
   }, []);
 
   const handleLogout = async () => {
@@ -274,6 +302,15 @@ export default function AdminTuPage() {
     (item) => normalisasiStatusIzin(item.status) === "DISETUJUI"
   ).length;
 
+  const kunciPencarianSiswa = pencarianSiswa.trim().toLowerCase();
+  const siswaTampil = daftarSiswa.filter((siswa) =>
+    kunciPencarianSiswa
+      ? [siswa.nisn, siswa.nama, siswa.kelas].some((nilai) =>
+          nilai.toLowerCase().includes(kunciPencarianSiswa)
+        )
+      : true
+  );
+
   return (
     <main className="min-h-screen bg-[#f8fbff] text-slate-800 font-sans pb-16">
       <PageHeader
@@ -360,6 +397,87 @@ export default function AdminTuPage() {
             </h3>
           </div>
         </div>
+
+        <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
+          <div className="flex flex-col gap-3 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <h2 className="text-sm font-bold text-slate-900">
+                Data Siswa / Backup Sandi Siswa
+              </h2>
+              <p className="mt-0.5 text-[11px] text-slate-500">
+                Daftar siswa aktif dan sandi awal. Impor data PPDB secara massal
+                dari file CSV.
+              </p>
+            </div>
+            <div className="flex flex-col items-stretch gap-2 sm:items-end">
+              <input
+                type="search"
+                value={pencarianSiswa}
+                onChange={(e) => setPencarianSiswa(e.target.value)}
+                placeholder="Cari NISN, nama, atau kelas..."
+                className="w-full rounded-lg border border-slate-200 bg-white px-3 py-2 text-[11px] text-slate-700 outline-none transition focus:border-blue-500 sm:w-64"
+              />
+              <ImporDataSiswa
+                daftarSiswaSaatIni={daftarSiswa}
+                onSelesaiImpor={() =>
+                  setDaftarSiswa((sebelumnya) =>
+                    gabungkanSiswaLokalLengkap(sebelumnya)
+                  )
+                }
+              />
+            </div>
+          </div>
+
+          <div className="px-4 py-2.5 text-[10px] font-semibold text-slate-500">
+            {siswaTampil.length} dari {daftarSiswa.length} siswa ditampilkan
+          </div>
+
+          {siswaTampil.length === 0 ? (
+            <p className="p-8 text-center text-xs text-slate-400">
+              Tidak ada siswa yang cocok dengan pencarian.
+            </p>
+          ) : (
+            <div className="max-h-[360px] overflow-auto">
+              <table className="w-full min-w-[720px] text-left text-xs">
+                <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
+                  <tr>
+                    <th className="p-3">NISN</th>
+                    <th className="p-3">Nama Lengkap</th>
+                    <th className="p-3">Kelas</th>
+                    <th className="p-3">Sandi Awal</th>
+                    <th className="p-3">No WA Wali</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100">
+                  {siswaTampil.map((siswa) => (
+                    <tr
+                      key={siswa.nisn}
+                      className="transition hover:bg-slate-50/70"
+                    >
+                      <td className="whitespace-nowrap p-3 font-mono text-[11px] font-bold text-slate-700">
+                        {siswa.nisn}
+                      </td>
+                      <td className="p-3 font-semibold text-slate-800">
+                        {siswa.nama}
+                      </td>
+                      <td className="whitespace-nowrap p-3 text-slate-600">
+                        {siswa.kelas || "-"}
+                      </td>
+                      <td className="whitespace-nowrap p-3">
+                        <code className="rounded border border-slate-200 bg-slate-100 px-2 py-1 font-mono text-[11px] text-slate-700">
+                          {siswa.sandi}
+                        </code>
+                      </td>
+                      <td className="whitespace-nowrap p-3 text-slate-500">
+                        {siswa.noWaWali || "-"}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </section>
 
         <section className="mb-6 overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
           <div className="flex flex-col gap-2 border-b border-slate-100 bg-slate-50/50 p-4 sm:flex-row sm:items-center sm:justify-between">

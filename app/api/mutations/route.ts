@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { responsTersimpanLokal } from "@/lib/api-fallback";
 import { createMutation, getMutations } from "@/lib/db";
 import type { MutasiItem } from "@/lib/types";
 
@@ -15,8 +16,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+  let body: Partial<MutasiItem> = {};
   try {
-    const body = (await request.json()) as Partial<MutasiItem>;
+    body = (await request.json()) as Partial<MutasiItem>;
     if (
       !body.nama ||
       !body.nisn ||
@@ -51,9 +53,23 @@ export async function POST(request: Request) {
     return NextResponse.json(tersimpan, { status: 201 });
   } catch (error) {
     console.error("Gagal menyimpan data mutasi:", error);
-    return NextResponse.json(
-      { error: "Gagal menyimpan data mutasi." },
-      { status: 500 }
+    return responsTersimpanLokal(
+      {
+        ...body,
+        id: body.id ?? Date.now(),
+        nama: body.nama ?? "",
+        nisn: body.nisn ?? "",
+        jenisKelamin: body.jenisKelamin ?? "",
+        sekolahAsal: body.sekolahAsal ?? "",
+        kelasTujuan: body.kelasTujuan ?? "",
+        alasanPindah: body.alasanPindah ?? "",
+        namaWali: body.namaWali ?? "",
+        noTeleponWali: body.noTeleponWali ?? "",
+        tanggalPengajuan:
+          body.tanggalPengajuan || new Date().toLocaleDateString("id-ID"),
+        status: body.status || "Menunggu Verifikasi",
+      } as MutasiItem,
+      "Pendaftaran mutasi tersimpan di perangkat pengguna."
     );
   }
 }

@@ -1,19 +1,39 @@
 import { getStore, setStore, subscribeStore } from "./client-store";
 import { daftarSiswaFallback, normalisasiKelasSiswa } from "./data";
 import { STATUS_PRESENSI } from "./constants";
+import { STORAGE_KEYS } from "./storage";
 import type { CatatanAbsen, StatusPresensi } from "./types";
 
 /**
  * Penyimpanan presensi bersama untuk halaman input (`/presensi`), rekap
  * (`/rekap-presensi`), dan dashboard guru.
  *
- * `sekolah_presensi_data` adalah Single Source of Truth di browser sehingga
+ * `SMPN1KH_PRESENSI_DATA` adalah Single Source of Truth di browser sehingga
  * input guru langsung terbaca di seluruh halaman tanpa bergantung pada SQLite
  * Vercel yang bersifat read-only.
  */
 
-export const PRESENSI_STORAGE_KEY = "sekolah_presensi_data";
+export const PRESENSI_STORAGE_KEY = STORAGE_KEYS.presensiData;
 export const PRESENSI_STORE_EVENT = "smpn1:presensi-berubah";
+
+/** Kunci lama yang dimigrasikan otomatis ke kunci baru. */
+const PRESENSI_STORAGE_KEY_LAMA = "sekolah_presensi_data";
+
+function pastikanKunciPresensiTerbaru(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (window.localStorage.getItem(PRESENSI_STORAGE_KEY) !== null) return;
+
+    const dataLama = window.localStorage.getItem(PRESENSI_STORAGE_KEY_LAMA);
+    if (dataLama === null) return;
+
+    window.localStorage.setItem(PRESENSI_STORAGE_KEY, dataLama);
+    window.localStorage.removeItem(PRESENSI_STORAGE_KEY_LAMA);
+  } catch (error) {
+    console.error("Gagal memigrasikan kunci presensi:", error);
+  }
+}
 
 /** Kelas yang selalu ditampilkan pada filter rekap presensi. */
 export const KELAS_REKAP_PRESENSI = ["9A", "9B"] as const;
@@ -45,6 +65,7 @@ function normalkanCatatan(
 
 /** Baca seluruh rekap presensi yang tersimpan di browser. */
 export function bacaPresensiLokal(): CatatanAbsen[] {
+  pastikanKunciPresensiTerbaru();
   const mentah = getStore<unknown>(PRESENSI_STORAGE_KEY, []);
   if (!Array.isArray(mentah)) return [];
 

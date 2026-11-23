@@ -1,3 +1,4 @@
+import { clearStore, getStore, setStore } from "./client-store";
 import { PERAN_PEGAWAI } from "./constants";
 import type { PeranPegawai, PeranPengguna } from "./types";
 
@@ -22,7 +23,63 @@ export const STORAGE_KEYS = {
   statistikPengunjung: "statistik_pengunjung",
   daftarSiswaMutasi: "daftar_siswa_mutasi",
   migrasiDatabase: "migrasi_database_selesai",
+  // Single Source of Truth data operasional di browser.
+  suratIzin: "SMPN1KH_SURAT_IZIN",
+  presensiData: "SMPN1KH_PRESENSI_DATA",
+  jurnalData: "SMPN1KH_JURNAL_DATA",
+  // Daftar siswa hasil impor PPDB (lengkap dengan sandi awal).
+  studentsData: "SMPN1KH_STUDENTS_DATA",
 } as const;
+
+/**
+ * Pembantu localStorage yang aman dipakai saat SSR. Semua fungsi memakai
+ * engine `client-store` agar perubahan langsung memicu sinkronisasi antar
+ * komponen, tab, dan halaman tanpa reload.
+ */
+export function getData<T>(key: string, fallbackData: T): T {
+  return getStore<T>(key, fallbackData);
+}
+
+export function saveData<T>(key: string, data: T): boolean {
+  return setStore<T>(key, data);
+}
+
+export function updateItem<T extends object>(
+  key: string,
+  idKey: string,
+  idVal: string | number,
+  updateFields: Partial<T>
+): T[] {
+  const daftar = getStore<T[]>(key, []);
+  const hasil = daftar.map((item) => {
+    const nilaiId = (item as Record<string, unknown>)[idKey];
+    return String(nilaiId) === String(idVal)
+      ? { ...item, ...updateFields }
+      : item;
+  });
+
+  setStore<T[]>(key, hasil);
+  return hasil;
+}
+
+export function deleteItem<T extends object>(
+  key: string,
+  idKey: string,
+  idVal: string | number
+): T[] {
+  const daftar = getStore<T[]>(key, []);
+  const hasil = daftar.filter((item) => {
+    const nilaiId = (item as Record<string, unknown>)[idKey];
+    return String(nilaiId) !== String(idVal);
+  });
+
+  setStore<T[]>(key, hasil);
+  return hasil;
+}
+
+export function clearData(key: string): void {
+  clearStore(key);
+}
 
 export function apakahLogin(peran: PeranPengguna): boolean {
   if (typeof window === "undefined") return false;

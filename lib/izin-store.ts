@@ -6,6 +6,7 @@ import {
   subscribeStore,
 } from "./client-store";
 import { CONTOH_SURAT_IZIN } from "./memory-store";
+import { STORAGE_KEYS } from "./storage";
 import type { SuratIzinItem } from "./types";
 
 /**
@@ -21,7 +22,13 @@ import type { SuratIzinItem } from "./types";
 export const IZIN_STORE_EVENT = CLIENT_STORE_EVENT;
 
 /** Kunci localStorage untuk seluruh pengajuan izin. */
-export const PENGAJUAN_IZIN_STORAGE_KEY = "sekolah_pengajuan_izin";
+export const PENGAJUAN_IZIN_STORAGE_KEY = STORAGE_KEYS.suratIzin;
+
+/** Kunci lama yang dimigrasikan otomatis ke kunci baru. */
+const PENGAJUAN_IZIN_STORAGE_KEY_LAMA = "sekolah_pengajuan_izin";
+
+/** Penanda agar data contoh tidak muncul kembali setelah "Hapus Semua". */
+export const IZIN_TERHAPUS_SEMUA_KEY = "izin_terhapus_semua";
 
 /** Kunci internal untuk menandai store sudah dimigrasikan ke format baru. */
 const IZIN_VERSION_KEY = "smpn1_izin_store_version";
@@ -29,6 +36,55 @@ const IZIN_VERSION = "2";
 
 /** Kunci lama (peta override) yang dibersihkan setelah migrasi. */
 const IZIN_OVERRIDE_LAMA_KEY = "smpn1_izin_status_overrides_v1";
+
+function pastikanKunciIzinTerbaru(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    const dataBaru = window.localStorage.getItem(PENGAJUAN_IZIN_STORAGE_KEY);
+    if (dataBaru !== null) return;
+
+    const dataLama = window.localStorage.getItem(
+      PENGAJUAN_IZIN_STORAGE_KEY_LAMA
+    );
+    if (dataLama === null) return;
+
+    window.localStorage.setItem(PENGAJUAN_IZIN_STORAGE_KEY, dataLama);
+    window.localStorage.removeItem(PENGAJUAN_IZIN_STORAGE_KEY_LAMA);
+  } catch (error) {
+    console.error("Gagal memigrasikan kunci surat izin:", error);
+  }
+}
+
+function bacaFlagIzinTerhapusSemua(): boolean {
+  if (typeof window === "undefined") return false;
+
+  try {
+    return window.localStorage.getItem(IZIN_TERHAPUS_SEMUA_KEY) === "true";
+  } catch {
+    return false;
+  }
+}
+
+function tandaiIzinTerhapusSemua(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.setItem(IZIN_TERHAPUS_SEMUA_KEY, "true");
+  } catch (error) {
+    console.error("Gagal menyimpan penanda hapus semua izin:", error);
+  }
+}
+
+function hapusFlagIzinTerhapusSemua(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    window.localStorage.removeItem(IZIN_TERHAPUS_SEMUA_KEY);
+  } catch (error) {
+    console.error("Gagal menghapus penanda hapus semua izin:", error);
+  }
+}
 
 export type StatusIzin = "MENUNGGU" | "DISETUJUI" | "DITOLAK";
 
@@ -111,6 +167,7 @@ function normalkanPengajuanIzin(item: unknown): SuratIzinItem | null {
 
 /** Baca seluruh pengajuan izin yang tersimpan di browser. */
 export function bacaPengajuanIzinLokal(): SuratIzinItem[] {
+  pastikanKunciIzinTerbaru();
   const mentah = getStore<unknown>(PENGAJUAN_IZIN_STORAGE_KEY, []);
   if (!Array.isArray(mentah)) return [];
 
@@ -213,6 +270,20 @@ function pastikanStoreIzinTerisi(
   if (typeof window === "undefined") return [];
 
   const lokal = bacaPengajuanIzinLokal();
+
+  // Setelah "Hapus Semua", jangan pernah mengisi ulang store dengan data
+  // contoh/server. Bila ada pengajuan baru dari siswa, penanda dilepas.
+  if (bacaFlagIzinTerhapusSemua()) {
+    try {
+      window.localStorage.setItem(IZIN_VERSION_KEY, IZIN_VERSION);
+    } catch (error) {
+      console.error("Gagal menandai store izin kosong:", error);
+    }
+
+    if (lokal.length === 0) return lokal;
+    hapusFlagIzinTerhapusSemua();
+  }
+
   const sudahMigrasi =
     window.localStorage.getItem(IZIN_VERSION_KEY) === IZIN_VERSION;
 
@@ -283,6 +354,7 @@ export function simpanPengajuanIzinBaru(item: SuratIzinItem): void {
   );
 
   tulisPengajuanIzinLokal([bersih, ...tanpaDuplikat]);
+  hapusFlagIzinTerhapusSemua();
 }
 
 function itemIzinSama(
@@ -320,6 +392,7 @@ export function simpanOverrideIzin(item: SuratIzinItem): void {
     const bersih = normalkanPengajuanIzin(item);
     if (!bersih) return;
     tulisPengajuanIzinLokal([bersih, ...daftar]);
+    hapusFlagIzinTerhapusSemua();
     return;
   }
 
@@ -334,6 +407,7 @@ export function simpanOverrideIzin(item: SuratIzinItem): void {
     posisi === indeks ? gabungan : entri
   );
   tulisPengajuanIzinLokal(diperbarui);
+  hapusFlagIzinTerhapusSemua();
 }
 
 /** Terapkan status terbaru dari store ke satu berkas izin. */
@@ -352,9 +426,12 @@ export function terapkanOverrideIzin(item: SuratIzinItem): SuratIzinItem {
 export function hapusSemuaOverrideIzin(): void {
   if (typeof window === "undefined") return;
 
+  tandaiIzinTerhapusSemua();
+
   try {
     window.localStorage.setItem(IZIN_VERSION_KEY, IZIN_VERSION);
     window.localStorage.removeItem(IZIN_OVERRIDE_LAMA_KEY);
+    window.localStorage.removeItem(PENGAJUAN_IZIN_STORAGE_KEY_LAMA);
   } catch (error) {
     console.error("Gagal menandai reset store izin:", error);
   }
@@ -413,5 +490,6 @@ export function berlanggananPerubahanIzin(
 
 /** Apakah store izin sudah pernah diinisialisasi di browser ini. */
 export function storeIzinSudahAda(): boolean {
+  pastikanKunciIzinTerbaru();
   return hasStore(PENGAJUAN_IZIN_STORAGE_KEY);
 }

@@ -11,6 +11,10 @@ import {
   buatPresensiFallback,
   gabungPresensi,
 } from "@/lib/presensi-store";
+import {
+  berlanggananPerubahanSiswa,
+  daftarKelasSiswaLokal,
+} from "@/lib/siswa-store";
 import type { CatatanAbsen, StatusPresensi } from "@/lib/types";
 import { ambilTanggalHariIni } from "@/lib/utils";
 
@@ -19,6 +23,9 @@ export default function RekapPresensiPublikPage() {
   const [dariServer, setDariServer] = useState<CatatanAbsen[]>([]);
   const [kelasPilihan, setKelasPilihan] = useState<string>("Semua");
   const [tanggalPilihan, setTanggalPilihan] = useState<string>("");
+  const [pilihanKelas, setPilihanKelas] = useState<string[]>([
+    ...KELAS_REKAP_PRESENSI,
+  ]);
   const [memuat, setMemuat] = useState(true);
 
   useEffect(() => {
@@ -45,6 +52,17 @@ export default function RekapPresensiPublikPage() {
     };
   }, []);
 
+  // Kelas baru dari hasil impor PPDB juga masuk ke filter rekap presensi.
+  useEffect(() => {
+    const muat = () =>
+      setPilihanKelas(
+        Array.from(new Set([...KELAS_REKAP_PRESENSI, ...daftarKelasSiswaLokal()]))
+      );
+
+    muat();
+    return berlanggananPerubahanSiswa(muat);
+  }, []);
+
   // Gabungkan data server dengan localStorage dan ikuti perubahan store agar
   // input presensi terbaru langsung tampil tanpa reload.
   useEffect(() => {
@@ -68,13 +86,22 @@ export default function RekapPresensiPublikPage() {
   const memakaiFallback =
     Boolean(tanggalPilihan) && !memuat && dataTanggal.length === 0;
 
-  const sumberTampil = useMemo(
-    () =>
-      memakaiFallback
-        ? buatPresensiFallback(tanggalPilihan)
-        : daftarPresensi,
-    [memakaiFallback, tanggalPilihan, daftarPresensi]
-  );
+  const sumberTampil = useMemo(() => {
+    if (!tanggalPilihan) return daftarPresensi;
+
+    const dataTanggal = daftarPresensi.filter(
+      (item) => item.tanggal === tanggalPilihan
+    );
+    const kelasTerdata = new Set(dataTanggal.map((item) => item.kelas));
+
+    // Lengkapi kelas 9A/9B yang belum diinput pada tanggal tersebut dengan
+    // data awal 63 siswa agar tabel tidak menampilkan "0 siswa terdata".
+    const dataAwal = buatPresensiFallback(tanggalPilihan).filter(
+      (item) => !kelasTerdata.has(item.kelas)
+    );
+
+    return [...dataTanggal, ...dataAwal];
+  }, [tanggalPilihan, daftarPresensi]);
 
   // Filter data sesuai kelas & tanggal yang dipilih siswa
   const hasilFilter = useMemo(() => {
@@ -143,7 +170,7 @@ export default function RekapPresensiPublikPage() {
                 className="bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold text-slate-800 focus:outline-none focus:border-blue-600"
               >
                 <option value="Semua">Semua Kelas</option>
-                {KELAS_REKAP_PRESENSI.map((kelas) => (
+                {pilihanKelas.map((kelas) => (
                   <option key={kelas} value={kelas}>
                     Kelas {kelas}
                   </option>

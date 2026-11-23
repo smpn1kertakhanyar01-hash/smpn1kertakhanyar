@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { responsTersimpanLokal } from "@/lib/api-fallback";
 import {
   createKategoriKejadian,
   getKategoriKejadian,
@@ -9,19 +10,15 @@ export async function GET() {
     return NextResponse.json(getKategoriKejadian());
   } catch (error) {
     console.error("Gagal membaca kategori kejadian:", error);
-    return NextResponse.json(
-      { error: "Gagal membaca kategori kejadian." },
-      { status: 500 }
-    );
+    return NextResponse.json([]);
   }
 }
 
 export async function POST(request: Request) {
+  let body: { namaKategori?: string; poin?: number } = {};
+
   try {
-    const body = (await request.json()) as {
-      namaKategori?: string;
-      poin?: number;
-    };
+    body = (await request.json()) as typeof body;
 
     const namaKategori = body.namaKategori?.trim();
     if (!namaKategori) {
@@ -50,9 +47,14 @@ export async function POST(request: Request) {
     }
 
     console.error("Gagal menyimpan kategori kejadian:", error);
-    return NextResponse.json(
-      { error: "Gagal menyimpan kategori kejadian." },
-      { status: 500 }
+    return responsTersimpanLokal(
+      {
+        id: Date.now(),
+        namaKategori: body.namaKategori?.trim() ?? "",
+        poin: body.poin ?? 0,
+        createdAt: new Date().toISOString(),
+      },
+      "Kategori kejadian tersimpan di perangkat pengguna."
     );
   }
 }

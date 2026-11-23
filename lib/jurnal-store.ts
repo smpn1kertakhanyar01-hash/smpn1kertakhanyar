@@ -1,6 +1,7 @@
 import { getStore, setStore, subscribeStore } from "./client-store";
 import { KATEGORI_KEJADIAN } from "./constants";
 import { CONTOH_INSIDEN_SEKOLAH } from "./memory-store";
+import { STORAGE_KEYS } from "./storage";
 import type { CatatanKejadianItem, KategoriKejadian } from "./types";
 import { ambilTanggalPanjang, ambilWaktuSekarang } from "./utils";
 
@@ -8,16 +9,35 @@ import { ambilTanggalPanjang, ambilWaktuSekarang } from "./utils";
  * Penyimpanan jurnal kejadian bersama untuk Dashboard Guru dan halaman
  * Jurnal Kesiswaan siswa.
  *
- * `sekolah_jurnal_data` adalah Single Source of Truth di browser sehingga
+ * `SMPN1KH_JURNAL_DATA` adalah Single Source of Truth di browser sehingga
  * catatan yang baru disimpan guru langsung muncul di riwayat tanpa gagal
  * simpan, meskipun SQLite Vercel bersifat read-only.
  */
 
-export const JURNAL_STORAGE_KEY = "sekolah_jurnal_data";
+export const JURNAL_STORAGE_KEY = STORAGE_KEYS.jurnalData;
 export const JURNAL_STORE_EVENT = "smpn1:jurnal-berubah";
+
+/** Kunci lama yang dimigrasikan otomatis ke kunci baru. */
+const JURNAL_STORAGE_KEY_LAMA = "sekolah_jurnal_data";
 
 const JURNAL_VERSION_KEY = "smpn1_jurnal_store_version";
 const JURNAL_VERSION = "2";
+
+function pastikanKunciJurnalTerbaru(): void {
+  if (typeof window === "undefined") return;
+
+  try {
+    if (window.localStorage.getItem(JURNAL_STORAGE_KEY) !== null) return;
+
+    const dataLama = window.localStorage.getItem(JURNAL_STORAGE_KEY_LAMA);
+    if (dataLama === null) return;
+
+    window.localStorage.setItem(JURNAL_STORAGE_KEY, dataLama);
+    window.localStorage.removeItem(JURNAL_STORAGE_KEY_LAMA);
+  } catch (error) {
+    console.error("Gagal memigrasikan kunci jurnal:", error);
+  }
+}
 
 function apakahKategoriKejadian(nilai: unknown): nilai is KategoriKejadian {
   return (KATEGORI_KEJADIAN as readonly { value: string }[]).some(
@@ -53,6 +73,7 @@ function normalkanCatatanKejadian(
 
 /** Baca seluruh catatan jurnal yang tersimpan di browser. */
 export function bacaJurnalLokal(): CatatanKejadianItem[] {
+  pastikanKunciJurnalTerbaru();
   const mentah = getStore<unknown>(JURNAL_STORAGE_KEY, []);
   if (!Array.isArray(mentah)) return [];
 

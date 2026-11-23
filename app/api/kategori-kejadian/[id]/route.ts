@@ -1,18 +1,27 @@
 import { NextResponse } from "next/server";
 import {
+  responsBerhasilLokal,
+  responsTersimpanLokal,
+} from "@/lib/api-fallback";
+import {
   deleteKategoriKejadian,
   getKategoriKejadianById,
   updateKategoriKejadian,
 } from "@/lib/db-kesiswaan";
+import type { KategoriKejadianMaster } from "@/lib/types";
 
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
 
 export async function PATCH(request: Request, context: RouteContext) {
+  let nomorId = 0;
+  let lama: KategoriKejadianMaster | null = null;
+  let body: { namaKategori?: string; poin?: number } = {};
+
   try {
     const { id } = await context.params;
-    const nomorId = Number(id);
+    nomorId = Number(id);
     if (!Number.isInteger(nomorId) || nomorId <= 0) {
       return NextResponse.json(
         { error: "ID kategori tidak valid." },
@@ -20,17 +29,15 @@ export async function PATCH(request: Request, context: RouteContext) {
       );
     }
 
-    if (!getKategoriKejadianById(nomorId)) {
+    lama = getKategoriKejadianById(nomorId);
+    if (!lama) {
       return NextResponse.json(
         { error: "Kategori kejadian tidak ditemukan." },
         { status: 404 }
       );
     }
 
-    const body = (await request.json()) as {
-      namaKategori?: string;
-      poin?: number;
-    };
+    body = (await request.json()) as typeof body;
 
     const namaKategori =
       body.namaKategori === undefined ? undefined : body.namaKategori.trim();
@@ -63,9 +70,15 @@ export async function PATCH(request: Request, context: RouteContext) {
     }
 
     console.error("Gagal memperbarui kategori kejadian:", error);
-    return NextResponse.json(
-      { error: "Gagal memperbarui kategori kejadian." },
-      { status: 500 }
+    return responsTersimpanLokal(
+      {
+        id: lama?.id ?? (nomorId > 0 ? nomorId : Date.now()),
+        namaKategori:
+          body.namaKategori?.trim() ?? lama?.namaKategori ?? "",
+        poin: body.poin ?? lama?.poin ?? 0,
+        createdAt: lama?.createdAt ?? new Date().toISOString(),
+      },
+      "Perubahan kategori tersimpan di perangkat pengguna."
     );
   }
 }
@@ -82,18 +95,15 @@ export async function DELETE(_request: Request, context: RouteContext) {
     }
 
     if (!deleteKategoriKejadian(nomorId)) {
-      return NextResponse.json(
-        { error: "Kategori kejadian tidak ditemukan." },
-        { status: 404 }
-      );
+      // Idempoten: data mungkin hanya ada di browser pengguna.
+      return responsBerhasilLokal("Kategori kejadian sudah tidak tersedia.");
     }
 
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ ok: true, success: true });
   } catch (error) {
     console.error("Gagal menghapus kategori kejadian:", error);
-    return NextResponse.json(
-      { error: "Gagal menghapus kategori kejadian." },
-      { status: 500 }
+    return responsBerhasilLokal(
+      "Penghapusan kategori diterapkan di perangkat pengguna."
     );
   }
 }
