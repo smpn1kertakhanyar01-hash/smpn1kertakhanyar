@@ -10,7 +10,16 @@ import NotifikasiWhatsAppFallback, {
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
 import { daftarSiswaFallback } from "@/lib/data";
+import {
+  bacaAntreanIjazah,
+  berlanggananPerubahanIjazah,
+} from "@/lib/ijazah-store";
 import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
+import {
+  bacaDaftarMutasiLokal,
+  berlanggananPerubahanMutasi,
+  gabungkanMutasi,
+} from "@/lib/mutasi-store";
 import {
   ambilDaftarIzinLengkap,
   berlanggananPerubahanIzin,
@@ -53,6 +62,7 @@ export default function AdminTuPage() {
   const [nama, setNama] = useState("");
   const [tabAktif, setTabAktif] = useState<TabTu>("Data Siswa & PPDB");
   const [daftarMutasi, setDaftarMutasi] = useState<MutasiSiswa[]>([]);
+  const [jumlahAntreanIjazah, setJumlahAntreanIjazah] = useState(0);
   const [daftarIzin, setDaftarIzin] = useState<SuratIzinItem[]>([]);
   const [daftarSiswa, setDaftarSiswa] = useState<SiswaLokal[]>([]);
   const [pencarianSiswa, setPencarianSiswa] = useState("");
@@ -87,12 +97,13 @@ export default function AdminTuPage() {
 
     let masihAktif = true;
     const muatData = async () => {
+      let mutasiDariServer: MutasiSiswa[] = [];
       try {
-        const data = await api.getMutasiSiswa();
-        if (masihAktif) setDaftarMutasi(data);
+        mutasiDariServer = await api.getMutasiSiswa();
       } catch (error) {
         console.error("Gagal memuat rekap mutasi:", error);
       }
+      if (masihAktif) setDaftarMutasi(gabungkanMutasi(mutasiDariServer));
 
       try {
         const siswa = await api.getStudents();
@@ -144,6 +155,20 @@ export default function AdminTuPage() {
         gabungkanSiswaLokalLengkap(sebelumnya)
       );
     });
+  }, []);
+
+  // Rekap mutasi dan antrean ijazah mengikuti keputusan di halaman detail.
+  useEffect(() => {
+    return berlanggananPerubahanMutasi(() => {
+      if (window.localStorage.getItem(PERAN_PENGGUNA_LOKAL_KEY) !== "tu") return;
+      setDaftarMutasi(bacaDaftarMutasiLokal());
+    });
+  }, []);
+
+  useEffect(() => {
+    const sinkron = () => setJumlahAntreanIjazah(bacaAntreanIjazah().length);
+    sinkron();
+    return berlanggananPerubahanIjazah(sinkron);
   }, []);
 
   const handleLogout = async () => {
@@ -725,16 +750,21 @@ export default function AdminTuPage() {
 
               <div className="mt-5 rounded-xl border border-amber-100 bg-amber-50/70 p-4">
                 <p className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
-                  Informasi Layanan
+                  Antrean Ijazah
                 </p>
                 <p className="mt-1 text-[11px] leading-relaxed text-amber-900">
-                  Persyaratan pengambilan ijazah ditampilkan di beranda publik
-                  dan dapat diperbarui melalui pengaturan layanan.
+                  {jumlahAntreanIjazah} pengajuan tersimpan di perangkat.
+                  Syarat &amp; status verifikasi langsung aktif di halaman
+                  layanan publik.
                 </p>
               </div>
-              <p className="mt-4 text-[10px] text-slate-400">
-                Gunakan menu Pengaturan Akun untuk mengganti kata sandi staf.
-              </p>
+
+              <Link
+                href="/admin-tu/ijazah"
+                className="mt-5 inline-flex w-full items-center justify-center rounded-xl bg-amber-600 px-4 py-2.5 text-xs font-bold text-white transition hover:bg-amber-700"
+              >
+                Buka Administrasi Ijazah →
+              </Link>
             </section>
           </div>
         )}

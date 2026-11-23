@@ -9,8 +9,17 @@ import NotifikasiWhatsAppFallback, {
 } from "@/components/NotifikasiWhatsAppFallback";
 import { api } from "@/lib/api-client";
 import { clearStore, setStore } from "@/lib/client-store";
-import { KATEGORI_KEJADIAN, KATEGORI_PENGAMBILAN_IJAZAH } from "@/lib/constants";
+import { KATEGORI_KEJADIAN } from "@/lib/constants";
 import { daftarAkunSandiSiswaFallback } from "@/lib/data";
+import {
+  bacaAntreanIjazah,
+  bacaPengaturanIjazahLokal,
+  berlanggananPerubahanIjazah,
+  hapusIjazahLokal,
+  perbaruiIjazahLokal,
+  simpanDaftarSyaratIjazah,
+  tambahIjazahLokal,
+} from "@/lib/ijazah-store";
 import { susunHasilNotifikasiIzin } from "@/lib/izin-notifikasi";
 import {
   PENGAJUAN_IZIN_STORAGE_KEY,
@@ -22,6 +31,12 @@ import {
   terapkanOverrideIzin,
 } from "@/lib/izin-store";
 import { CONTOH_SURAT_IZIN } from "@/lib/memory-store";
+import {
+  bacaDaftarMutasiLokal,
+  berlanggananPerubahanMutasi,
+  gabungkanMutasi,
+  simpanPerubahanMutasi,
+} from "@/lib/mutasi-store";
 import {
   ambilJurnalLengkap,
   berlanggananPerubahanJurnal,
@@ -338,31 +353,22 @@ export default function DashboardGuruPage() {
       }
 
       // Menu Administrasi Tata Usaha hanya dimuat untuk Admin TU.
+      // localStorage adalah sumber utama; API hanya dipakai sebagai cadangan
+      // pengisian awal mutasi dan boleh gagal tanpa menampilkan error.
       if (adminTu) {
+        let mutasiDariServer: MutasiSiswa[] = [];
         try {
-          const mutasi = await api.getMutasiSiswa();
-          if (masihAktif) setDaftarMutasi(mutasi);
+          mutasiDariServer = await api.getMutasiSiswa();
         } catch (error) {
           console.error("Gagal memuat data mutasi siswa:", error);
         }
 
-        try {
-          const ijazah = await api.getPengambilanIjazah();
-          if (masihAktif) setDaftarIjazah(ijazah);
-        } catch (error) {
-          console.error("Gagal memuat administrasi ijazah:", error);
-        }
-
-        try {
-          const syarat = await api.getPengaturanLayanan(
-            KATEGORI_PENGAMBILAN_IJAZAH
-          );
-          if (masihAktif) {
-            setPengaturanSyaratIjazah(syarat);
-            setDraftSyaratIjazah(syarat.isiPersyaratan);
-          }
-        } catch (error) {
-          console.error("Gagal memuat persyaratan ijazah:", error);
+        if (masihAktif) {
+          setDaftarMutasi(gabungkanMutasi(mutasiDariServer));
+          setDaftarIjazah(bacaAntreanIjazah());
+          const syarat = bacaPengaturanIjazahLokal();
+          setPengaturanSyaratIjazah(syarat);
+          setDraftSyaratIjazah(syarat.isiPersyaratan);
         }
       }
 
@@ -455,6 +461,25 @@ export default function DashboardGuruPage() {
 
     muat();
     return berlanggananPerubahanSiswa(muat);
+  }, []);
+
+  // Keputusan mutasi dan perubahan ijazah dari halaman TU lain langsung
+  // tercermin di tab administrasi (khusus Admin TU).
+  useEffect(() => {
+    return berlanggananPerubahanMutasi(() => {
+      if (bacaPeranPenggunaLokal() !== "tu" || !apakahLogin("guru")) return;
+      setDaftarMutasi(bacaDaftarMutasiLokal());
+    });
+  }, []);
+
+  useEffect(() => {
+    return berlanggananPerubahanIjazah(() => {
+      if (bacaPeranPenggunaLokal() !== "tu" || !apakahLogin("guru")) return;
+      setDaftarIjazah(bacaAntreanIjazah());
+      const syarat = bacaPengaturanIjazahLokal();
+      setPengaturanSyaratIjazah(syarat);
+      setDraftSyaratIjazah(syarat.isiPersyaratan);
+    });
   }, []);
 
   const handleLogout = async () => {
@@ -798,9 +823,9 @@ Terima kasih.`;
   };
 
   const terapkanHasilMutasi = (hasil: MutasiSiswa) => {
-    setDaftarMutasi((prev) =>
-      prev.map((item) => (item.id === hasil.id ? hasil : item))
-    );
+    // Simpan ke localStorage lebih dulu agar keputusan tidak hilang saat
+    // SQLite Vercel gagal ditulisi.
+    setDaftarMutasi(simpanPerubahanMutasi(hasil.id, hasil));
     setMutasiTerpilih((prev) =>
       prev && prev.id === hasil.id ? hasil : prev
     );
@@ -821,26 +846,27 @@ Terima kasih.`;
     if (nomor === null) return;
 
     setMemprosesMutasi(item.id);
-    try {
-      const hasil = await api.updateMutasiSiswa(item.id, {
+    const hasil: MutasiSiswa = {
+      ...item,
+      statusBerkas: "Disetujui",
+      noSuratMutasi: nomor.trim() || null,
+    };
+    terapkanHasilMutasi(hasil);
+    alert(
+      nomor.trim()
+        ? `Permohonan mutasi ${namaSiswa} disetujui dengan Nomor Surat: ${nomor.trim()}`
+        : `Permohonan mutasi ${namaSiswa} berhasil disetujui.`
+    );
+    setMemprosesMutasi(null);
+
+    void api
+      .updateMutasiSiswa(item.id, {
         statusBerkas: "Disetujui",
         noSuratMutasi: nomor.trim() || null,
-      });
-      terapkanHasilMutasi(hasil);
-      alert(
-        nomor.trim()
-          ? `Permohonan mutasi ${namaSiswa} disetujui dengan Nomor Surat: ${nomor.trim()}`
-          : `Permohonan mutasi ${namaSiswa} berhasil disetujui.`
+      })
+      .catch((error) =>
+        console.error("Gagal menyinkronkan persetujuan mutasi:", error)
       );
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menyetujui permohonan mutasi."
-      );
-    } finally {
-      setMemprosesMutasi(null);
-    }
   };
 
   const handleSetujuiMutasiDariModal = async () => {
@@ -849,26 +875,27 @@ Terima kasih.`;
       mutasiTerpilih.namaSiswa || `Siswa #${mutasiTerpilih.siswaId ?? mutasiTerpilih.id}`;
 
     setMemprosesMutasi(mutasiTerpilih.id);
-    try {
-      const hasil = await api.updateMutasiSiswa(mutasiTerpilih.id, {
+    const hasil: MutasiSiswa = {
+      ...mutasiTerpilih,
+      statusBerkas: "Disetujui",
+      noSuratMutasi: nomorSuratMutasi.trim() || null,
+    };
+    terapkanHasilMutasi(hasil);
+    alert(
+      nomorSuratMutasi.trim()
+        ? `Permohonan mutasi ${namaSiswa} disetujui dengan Nomor Surat: ${nomorSuratMutasi.trim()}`
+        : `Permohonan mutasi ${namaSiswa} berhasil disetujui.`
+    );
+    setMemprosesMutasi(null);
+
+    void api
+      .updateMutasiSiswa(mutasiTerpilih.id, {
         statusBerkas: "Disetujui",
         noSuratMutasi: nomorSuratMutasi.trim() || null,
-      });
-      terapkanHasilMutasi(hasil);
-      alert(
-        nomorSuratMutasi.trim()
-          ? `Permohonan mutasi ${namaSiswa} disetujui dengan Nomor Surat: ${nomorSuratMutasi.trim()}`
-          : `Permohonan mutasi ${namaSiswa} berhasil disetujui.`
+      })
+      .catch((error) =>
+        console.error("Gagal menyinkronkan persetujuan mutasi:", error)
       );
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menyetujui permohonan mutasi."
-      );
-    } finally {
-      setMemprosesMutasi(null);
-    }
   };
 
   const handleTolakMutasi = async (item: MutasiSiswa) => {
@@ -881,57 +908,49 @@ Terima kasih.`;
     if (alasan === null) return;
 
     setMemprosesMutasi(item.id);
-    try {
-      const hasil = await api.updateMutasiSiswa(item.id, {
-        statusBerkas: "Ditolak",
-      });
-      terapkanHasilMutasi(hasil);
-      alert(
-        `Permohonan mutasi ${namaSiswa} ditolak. Alasan: ${
-          alasan.trim() || "Berkas belum lengkap"
-        }`
+    terapkanHasilMutasi({ ...item, statusBerkas: "Ditolak" });
+    alert(
+      `Permohonan mutasi ${namaSiswa} ditolak. Alasan: ${
+        alasan.trim() || "Berkas belum lengkap"
+      }`
+    );
+    setMemprosesMutasi(null);
+
+    void api
+      .updateMutasiSiswa(item.id, { statusBerkas: "Ditolak" })
+      .catch((error) =>
+        console.error("Gagal menyinkronkan penolakan mutasi:", error)
       );
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menolak permohonan mutasi."
-      );
-    } finally {
-      setMemprosesMutasi(null);
-    }
   };
 
-  const handleTambahIjazah = async (e: React.FormEvent) => {
+  const handleTambahIjazah = (e: React.FormEvent) => {
     e.preventDefault();
-    try {
-      const baru = await api.createPengambilanIjazah({
-        namaSiswa: formIjazah.namaSiswa,
-        nisn: formIjazah.nisn || null,
-        kelas: formIjazah.kelas || null,
-        tahunLulus: formIjazah.tahunLulus || null,
-        status: "Belum Diambil",
-        catatan: formIjazah.catatan || null,
-      });
-      setDaftarIjazah((prev) => [baru, ...prev]);
-      setFormIjazah({
-        namaSiswa: "",
-        nisn: "",
-        kelas: "",
-        tahunLulus: String(new Date().getFullYear()),
-        catatan: "",
-      });
-      setTampilFormIjazah(false);
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menyimpan data pengambilan ijazah."
-      );
+
+    if (!formIjazah.namaSiswa.trim()) {
+      alert("Nama siswa wajib diisi.");
+      return;
     }
+
+    tambahIjazahLokal({
+      namaSiswa: formIjazah.namaSiswa.trim(),
+      nisn: formIjazah.nisn.trim() || null,
+      kelas: formIjazah.kelas.trim() || null,
+      tahunLulus: formIjazah.tahunLulus.trim() || null,
+      status: "Belum Diambil",
+      catatan: formIjazah.catatan.trim() || null,
+    });
+    setDaftarIjazah(bacaAntreanIjazah());
+    setFormIjazah({
+      namaSiswa: "",
+      nisn: "",
+      kelas: "",
+      tahunLulus: String(new Date().getFullYear()),
+      catatan: "",
+    });
+    setTampilFormIjazah(false);
   };
 
-  const handleAmbilIjazah = async (item: PengambilanIjazah) => {
+  const handleAmbilIjazah = (item: PengambilanIjazah) => {
     const namaPengambil = prompt(
       `Nama orang tua / wali yang mengambil ijazah ${item.namaSiswa}:`,
       item.diambilOleh ?? ""
@@ -943,76 +962,43 @@ Terima kasih.`;
     }
 
     setMemprosesIjazah(item.id);
-    try {
-      const hasil = await api.updatePengambilanIjazah(item.id, {
+    setDaftarIjazah(
+      perbaruiIjazahLokal(item.id, {
         status: "Diambil",
         tanggalAmbil: new Date().toISOString().slice(0, 10),
         diambilOleh: namaPengambil.trim(),
         petugas: namaPegawai || "Admin TU",
-      });
-      setDaftarIjazah((prev) =>
-        prev.map((ijazah) =>
-          ijazah.id === item.id ? { ...ijazah, ...hasil } : ijazah
-        )
-      );
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menandai ijazah sebagai sudah diambil."
-      );
-    } finally {
-      setMemprosesIjazah(null);
-    }
+      })
+    );
+    setMemprosesIjazah(null);
   };
 
-  const handleBatalkanAmbilIjazah = async (item: PengambilanIjazah) => {
+  const handleBatalkanAmbilIjazah = (item: PengambilanIjazah) => {
     if (!confirm(`Batalkan status pengambilan ijazah ${item.namaSiswa}?`)) {
       return;
     }
 
     setMemprosesIjazah(item.id);
-    try {
-      const hasil = await api.updatePengambilanIjazah(item.id, {
+    setDaftarIjazah(
+      perbaruiIjazahLokal(item.id, {
         status: "Belum Diambil",
         tanggalAmbil: null,
         diambilOleh: null,
-      });
-      setDaftarIjazah((prev) =>
-        prev.map((ijazah) =>
-          ijazah.id === item.id ? { ...ijazah, ...hasil } : ijazah
-        )
-      );
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal membatalkan status pengambilan ijazah."
-      );
-    } finally {
-      setMemprosesIjazah(null);
-    }
+        petugas: null,
+      })
+    );
+    setMemprosesIjazah(null);
   };
 
-  const handleHapusIjazah = async (item: PengambilanIjazah) => {
+  const handleHapusIjazah = (item: PengambilanIjazah) => {
     if (!confirm(`Hapus arsip pengambilan ijazah ${item.namaSiswa}?`)) return;
 
     setMemprosesIjazah(item.id);
-    try {
-      await api.deletePengambilanIjazah(item.id);
-      setDaftarIjazah((prev) => prev.filter((ijazah) => ijazah.id !== item.id));
-    } catch (error) {
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal menghapus arsip pengambilan ijazah."
-      );
-    } finally {
-      setMemprosesIjazah(null);
-    }
+    setDaftarIjazah(hapusIjazahLokal(item.id));
+    setMemprosesIjazah(null);
   };
 
-  const handleSimpanSyaratIjazah = async (e: React.FormEvent) => {
+  const handleSimpanSyaratIjazah = (e: React.FormEvent) => {
     e.preventDefault();
 
     if (!draftSyaratIjazah.trim()) {
@@ -1022,12 +1008,13 @@ Terima kasih.`;
 
     setMenyimpanSyaratIjazah(true);
     try {
-      const hasil = await api.simpanPengaturanLayanan(
-        KATEGORI_PENGAMBILAN_IJAZAH,
-        draftSyaratIjazah
+      const hasil = simpanDaftarSyaratIjazah(
+        draftSyaratIjazah.split(/\r?\n/),
+        namaPegawai || "Admin TU"
       );
-      setPengaturanSyaratIjazah(hasil);
-      setDraftSyaratIjazah(hasil.isiPersyaratan);
+      const pengaturan = bacaPengaturanIjazahLokal();
+      setPengaturanSyaratIjazah(pengaturan);
+      setDraftSyaratIjazah(pengaturan.isiPersyaratan);
       setNotifikasiSukses(
         `Persyaratan pengambilan ijazah berhasil disimpan oleh ${
           hasil.updatedBy || "Admin TU"

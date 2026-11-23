@@ -6,13 +6,21 @@ import { useRouter } from "next/navigation";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
 import {
+  bacaDaftarMutasiLokal,
+  berlanggananPerubahanMutasi,
+  gabungkanMutasi,
+  mutasiStoreSudahAda,
+  simpanPerubahanMutasi,
+  tambahMutasiLokal,
+} from "@/lib/mutasi-store";
+import {
   apakahAdminTu,
   apakahLogin,
   bacaPeranPenggunaLokal,
   hapusSesiGuru,
   PERAN_PENGGUNA_LOKAL_KEY,
 } from "@/lib/storage";
-import type { MutasiSiswa } from "@/lib/types";
+import type { MutasiSiswa, MutasiSiswaPayload } from "@/lib/types";
 
 type FilterJenis = "SEMUA" | "MASUK" | "KELUAR";
 type FilterStatus =
@@ -32,6 +40,28 @@ const BERKAS_FISIK = [
 const STATUS_TERVERIFIKASI = "Berkas Terverifikasi";
 const STATUS_DISETUJUI = "Disetujui";
 const STATUS_DITOLAK = "Ditolak";
+
+interface FormMutasiBaru {
+  namaSiswa: string;
+  nisn: string;
+  jenisMutasi: "MASUK" | "KELUAR";
+  kelas: string;
+  sekolah: string;
+  alasan: string;
+  namaWali: string;
+  noTeleponWali: string;
+}
+
+const FORM_MUTASI_KOSONG: FormMutasiBaru = {
+  namaSiswa: "",
+  nisn: "",
+  jenisMutasi: "MASUK",
+  kelas: "",
+  sekolah: "",
+  alasan: "",
+  namaWali: "",
+  noTeleponWali: "",
+};
 
 function berkasSudahDiverifikasi(status: string): boolean {
   const teks = status.toLowerCase();
@@ -86,6 +116,8 @@ export default function AdminTuMutasiPage() {
     url: string;
     nama: string;
   } | null>(null);
+  const [tampilFormBaru, setTampilFormBaru] = useState(false);
+  const [formBaru, setFormBaru] = useState<FormMutasiBaru>(FORM_MUTASI_KOSONG);
 
   useEffect(() => {
     bacaPeranPenggunaLokal();
@@ -103,33 +135,44 @@ export default function AdminTuMutasiPage() {
     setSiap(true);
 
     let masihAktif = true;
+    const terapkanDaftar = (data: MutasiSiswa[]) => {
+      setDaftar(data);
+      setBerkasFisik(
+        Object.fromEntries(
+          data.map((item) => [
+            item.id,
+            BERKAS_FISIK.map(() => berkasSudahDiverifikasi(item.statusBerkas)),
+          ])
+        )
+      );
+      setNomorSurat(
+        Object.fromEntries(
+          data.map((item) => [item.id, item.noSuratMutasi ?? ""])
+        )
+      );
+      setMemuat(false);
+    };
+
+    // Tampilkan data browser seketika agar tombol verifikasi langsung bisa
+    // diklik tanpa menunggu respons API/serverless.
+    const storeSudahAda = mutasiStoreSudahAda();
+    terapkanDaftar(gabungkanMutasi([]));
+
     const muatData = async () => {
+      // Server hanya dipakai sekali saat store masih kosong. Setelah itu
+      // localStorage selalu menang agar checklist pengguna tidak tertimpa.
+      if (storeSudahAda) return;
+
+      let dariServer: MutasiSiswa[] = [];
       try {
-        const data = await api.getMutasiSiswa();
-        if (!masihAktif) return;
-        setDaftar(data);
-        setBerkasFisik(
-          Object.fromEntries(
-            data.map((item) => [
-              item.id,
-              BERKAS_FISIK.map(() => berkasSudahDiverifikasi(item.statusBerkas)),
-            ])
-          )
-        );
-        setNomorSurat(
-          Object.fromEntries(
-            data.map((item) => [item.id, item.noSuratMutasi ?? ""])
-          )
-        );
+        dariServer = await api.getMutasiSiswa();
       } catch (error) {
-        if (!masihAktif) return;
-        setPesanError(
-          error instanceof Error
-            ? error.message
-            : "Gagal memuat data mutasi siswa."
-        );
-      } finally {
-        if (masihAktif) setMemuat(false);
+        console.error("Gagal memuat mutasi siswa dari server:", error);
+      }
+
+      if (!masihAktif) return;
+      if (dariServer.length > 0) {
+        terapkanDaftar(gabungkanMutasi(dariServer));
       }
     };
 
@@ -139,6 +182,28 @@ export default function AdminTuMutasiPage() {
       masihAktif = false;
     };
   }, [router]);
+
+  // Perubahan status dari halaman lain langsung tampil di rekap dan kartu.
+  useEffect(() => {
+    return berlanggananPerubahanMutasi(() => {
+      if (!apakahAdminTu()) return;
+      const data = bacaDaftarMutasiLokal();
+      setDaftar(data);
+      setBerkasFisik(
+        Object.fromEntries(
+          data.map((item) => [
+            item.id,
+            BERKAS_FISIK.map(() => berkasSudahDiverifikasi(item.statusBerkas)),
+          ])
+        )
+      );
+      setNomorSurat(
+        Object.fromEntries(
+          data.map((item) => [item.id, item.noSuratMutasi ?? ""])
+        )
+      );
+    });
+  }, []);
 
   const handleLogout = async () => {
     try {
@@ -211,9 +276,10 @@ export default function AdminTuMutasiPage() {
   );
 
   const perbaruiItem = (hasil: MutasiSiswa) => {
-    setDaftar((sebelumnya) =>
-      sebelumnya.map((item) => (item.id === hasil.id ? hasil : item))
-    );
+    // Tulis ke localStorage lebih dulu agar keputusan permanen walau API
+    // SQLite Vercel gagal.
+    const daftarTerbaru = simpanPerubahanMutasi(hasil.id, hasil);
+    setDaftar(daftarTerbaru);
     setNomorSurat((sebelumnya) => ({
       ...sebelumnya,
       [hasil.id]: hasil.noSuratMutasi ?? "",
@@ -240,7 +306,7 @@ export default function AdminTuMutasiPage() {
     return Boolean(daftarCek?.length) && daftarCek.every(Boolean);
   };
 
-  const handleVerifikasi = async (item: MutasiSiswa) => {
+  const handleVerifikasi = (item: MutasiSiswa) => {
     setPesanSukses("");
     setPesanError("");
 
@@ -252,26 +318,26 @@ export default function AdminTuMutasiPage() {
     }
 
     setMemproses(item.id);
-    try {
-      const hasil = await api.updateMutasiSiswa(item.id, {
-        statusBerkas: STATUS_TERVERIFIKASI,
-      });
-      perbaruiItem(hasil);
-      setPesanSukses(
-        `Berkas fisik ${item.namaSiswa ?? "siswa"} dinyatakan lengkap dan terverifikasi.`
+    const hasil: MutasiSiswa = {
+      ...item,
+      statusBerkas: STATUS_TERVERIFIKASI,
+    };
+    perbaruiItem(hasil);
+    setPesanSukses(
+      `Berkas fisik ${item.namaSiswa ?? "siswa"} dinyatakan lengkap dan terverifikasi.`
+    );
+    setMemproses(null);
+
+    // Kirim salinan ke server sebagai cadangan. Kegagalan SQLite tidak
+    // membatalkan status yang sudah tersimpan di localStorage.
+    void api
+      .updateMutasiSiswa(item.id, { statusBerkas: STATUS_TERVERIFIKASI })
+      .catch((error) =>
+        console.error("Gagal menyinkronkan verifikasi ke server:", error)
       );
-    } catch (error) {
-      setPesanError(
-        error instanceof Error
-          ? error.message
-          : "Gagal menyimpan verifikasi berkas."
-      );
-    } finally {
-      setMemproses(null);
-    }
   };
 
-  const handleKeputusan = async (
+  const handleKeputusan = (
     item: MutasiSiswa,
     keputusan: "Disetujui" | "Ditolak"
   ) => {
@@ -303,28 +369,67 @@ export default function AdminTuMutasiPage() {
     if (!konfirmasi) return;
 
     setMemproses(item.id);
-    try {
-      const hasil = await api.updateMutasiSiswa(item.id, {
+    const nomor = (nomorSurat[item.id] ?? "").trim();
+    const hasil: MutasiSiswa = {
+      ...item,
+      statusBerkas: keputusan,
+      ...(keputusan === STATUS_DISETUJUI ? { noSuratMutasi: nomor } : {}),
+    };
+    perbaruiItem(hasil);
+    setPesanSukses(
+      keputusan === STATUS_DISETUJUI
+        ? `Mutasi ${item.namaSiswa ?? "siswa"} berhasil disetujui.`
+        : `Pengajuan mutasi ${item.namaSiswa ?? "siswa"} ditolak.`
+    );
+    setMemproses(null);
+
+    void api
+      .updateMutasiSiswa(item.id, {
         statusBerkas: keputusan,
-        ...(keputusan === STATUS_DISETUJUI
-          ? { noSuratMutasi: (nomorSurat[item.id] ?? "").trim() }
-          : {}),
-      });
-      perbaruiItem(hasil);
-      setPesanSukses(
-        keputusan === STATUS_DISETUJUI
-          ? `Mutasi ${item.namaSiswa ?? "siswa"} berhasil disetujui.`
-          : `Pengajuan mutasi ${item.namaSiswa ?? "siswa"} ditolak.`
+        ...(keputusan === STATUS_DISETUJUI ? { noSuratMutasi: nomor } : {}),
+      })
+      .catch((error) =>
+        console.error("Gagal menyinkronkan keputusan ke server:", error)
       );
-    } catch (error) {
-      setPesanError(
-        error instanceof Error
-          ? error.message
-          : "Gagal menyimpan keputusan mutasi."
-      );
-    } finally {
-      setMemproses(null);
-    }
+  };
+
+  const handleTambahMutasiBaru = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const payload: MutasiSiswaPayload = {
+      siswaId: null,
+      namaSiswa: formBaru.namaSiswa.trim(),
+      nisn: formBaru.nisn.trim(),
+      jenisKelamin: "Laki-laki",
+      kelas: formBaru.kelas.trim() || null,
+      jenisMutasi: formBaru.jenisMutasi,
+      tanggalMutasi: new Date().toISOString().slice(0, 10),
+      sekolahAsalTujuan: formBaru.sekolah.trim(),
+      alasan: formBaru.alasan.trim(),
+      noSuratMutasi: null,
+      namaWali: formBaru.namaWali.trim() || null,
+      noTeleponWali: formBaru.noTeleponWali.trim() || null,
+      berkasPendukung: null,
+      statusBerkas: "Menunggu Verifikasi",
+    };
+
+    const baru = tambahMutasiLokal(payload);
+    setDaftar(bacaDaftarMutasiLokal());
+    setNomorSurat((sebelumnya) => ({ ...sebelumnya, [baru.id]: "" }));
+    setBerkasFisik((sebelumnya) => ({
+      ...sebelumnya,
+      [baru.id]: BERKAS_FISIK.map(() => false),
+    }));
+    setFormBaru(FORM_MUTASI_KOSONG);
+    setTampilFormBaru(false);
+    setPesanError("");
+    setPesanSukses(
+      `Pengajuan mutasi ${baru.namaSiswa} ditambahkan dan menunggu verifikasi.`
+    );
+
+    void api.createMutasiSiswa(payload).catch((error) =>
+      console.error("Gagal mengirim salinan pengajuan ke server:", error)
+    );
   };
 
   if (!siap) {
@@ -373,6 +478,117 @@ export default function AdminTuMutasiPage() {
             </p>
           </div>
         </div>
+
+        <div className="flex justify-end mb-4">
+          <button
+            type="button"
+            onClick={() => setTampilFormBaru((nilai) => !nilai)}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-blue-600 hover:bg-blue-700 px-4 py-2.5 text-xs font-bold text-white shadow-sm transition"
+          >
+            {tampilFormBaru ? "− Tutup Formulir" : "+ Ajukan Mutasi Baru"}
+          </button>
+        </div>
+
+        {tampilFormBaru && (
+          <form
+            onSubmit={handleTambahMutasiBaru}
+            className="bg-white border border-blue-200 rounded-2xl shadow-sm p-4 sm:p-5 mb-6"
+          >
+            <div className="flex items-start justify-between gap-3 mb-4">
+              <div>
+                <h2 className="text-sm font-bold text-slate-900">
+                  Formulir Pengajuan Mutasi Baru
+                </h2>
+                <p className="text-[11px] text-slate-500 mt-0.5">
+                  Berkas baru langsung masuk antrean dengan status Menunggu
+                  Verifikasi dan tersimpan di perangkat.
+                </p>
+              </div>
+              <button
+                type="button"
+                onClick={() => setTampilFormBaru(false)}
+                className="text-xs font-bold text-slate-500 hover:text-rose-600"
+              >
+                ✕
+              </button>
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {(
+                [
+                  ["Nama Siswa", "namaSiswa", "Contoh: Aisyah Putri Ramadhani", true],
+                  ["NISN", "nisn", "Contoh: 0119000157", true],
+                  ["Kelas", "kelas", "Contoh: 8B", false],
+                  ["Sekolah Asal / Tujuan", "sekolah", "Nama sekolah", true],
+                  ["Nama Orang Tua / Wali", "namaWali", "Nama wali", false],
+                  ["No. Telepon Wali", "noTeleponWali", "08xxxxxxxxxx", false],
+                ] as const
+              ).map(([label, kunci, placeholder, wajib]) => (
+                <label key={kunci} className="block">
+                  <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                    {label}
+                  </span>
+                  <input
+                    type="text"
+                    required={wajib}
+                    value={formBaru[kunci]}
+                    onChange={(e) =>
+                      setFormBaru((sebelumnya) => ({
+                        ...sebelumnya,
+                        [kunci]: e.target.value,
+                      }))
+                    }
+                    placeholder={placeholder}
+                    className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                  />
+                </label>
+              ))}
+              <label className="block">
+                <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Jenis Mutasi
+                </span>
+                <select
+                  value={formBaru.jenisMutasi}
+                  onChange={(e) =>
+                    setFormBaru((sebelumnya) => ({
+                      ...sebelumnya,
+                      jenisMutasi: e.target.value as FormMutasiBaru["jenisMutasi"],
+                    }))
+                  }
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-xs focus:outline-none focus:border-blue-500"
+                >
+                  <option value="MASUK">Mutasi Masuk</option>
+                  <option value="KELUAR">Mutasi Keluar</option>
+                </select>
+              </label>
+              <label className="block sm:col-span-2">
+                <span className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
+                  Alasan Mutasi
+                </span>
+                <textarea
+                  required
+                  rows={2}
+                  value={formBaru.alasan}
+                  onChange={(e) =>
+                    setFormBaru((sebelumnya) => ({
+                      ...sebelumnya,
+                      alasan: e.target.value,
+                    }))
+                  }
+                  placeholder="Alasan pengajuan mutasi"
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 text-xs focus:outline-none focus:border-blue-500"
+                />
+              </label>
+            </div>
+            <div className="mt-4 flex justify-end">
+              <button
+                type="submit"
+                className="rounded-xl bg-emerald-600 hover:bg-emerald-700 px-5 py-2.5 text-xs font-bold text-white transition"
+              >
+                Simpan Pengajuan
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">

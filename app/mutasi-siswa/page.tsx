@@ -5,7 +5,12 @@ import Link from "next/link";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
 import { KELAS_PENDAFTARAN, NOMOR_WHATSAPP } from "@/lib/constants";
-import type { JenisMutasi, MutasiSiswa } from "@/lib/types";
+import { tambahMutasiLokal } from "@/lib/mutasi-store";
+import type {
+  JenisMutasi,
+  MutasiSiswa,
+  MutasiSiswaPayload,
+} from "@/lib/types";
 
 interface FormMutasi {
   nama: string;
@@ -162,39 +167,36 @@ export default function MutasiSiswaPage() {
     e.preventDefault();
 
     setMenyimpan(true);
-    try {
-      const tersimpan = await api.createMutasiSiswa({
-        siswaId: null,
-        namaSiswa: formData.nama.trim(),
-        nisn: formData.nisn.trim(),
-        jenisKelamin:
-          jenisMutasi === "MASUK" ? formData.jenisKelamin : null,
-        kelas: formData.kelas,
-        jenisMutasi,
-        tanggalMutasi: new Date().toISOString().slice(0, 10),
-        sekolahAsalTujuan: formData.sekolah.trim(),
-        alasan: formData.alasan.trim(),
-        noSuratMutasi: null,
-        namaWali: formData.namaWali.trim() || null,
-        noTeleponWali: formData.noTeleponWali.trim() || null,
-        berkasPendukung: berkas || null,
-        statusBerkas: "Menunggu Verifikasi",
-      });
 
-      setTautanWa(buatTautanWhatsAppAdmin(tersimpan));
-      setSisaDetik(3);
-      setSudahDialihkan(false);
-      setNotifSukses(true);
-    } catch (error) {
-      console.error("Gagal menyimpan data mutasi:", error);
-      alert(
-        error instanceof Error
-          ? error.message
-          : "Gagal mengirim berkas permohonan mutasi. Silakan coba lagi."
-      );
-    } finally {
-      setMenyimpan(false);
-    }
+    const payload: MutasiSiswaPayload = {
+      siswaId: null,
+      namaSiswa: formData.nama.trim(),
+      nisn: formData.nisn.trim(),
+      jenisKelamin: jenisMutasi === "MASUK" ? formData.jenisKelamin : null,
+      kelas: formData.kelas,
+      jenisMutasi,
+      tanggalMutasi: new Date().toISOString().slice(0, 10),
+      sekolahAsalTujuan: formData.sekolah.trim(),
+      alasan: formData.alasan.trim(),
+      noSuratMutasi: null,
+      namaWali: formData.namaWali.trim() || null,
+      noTeleponWali: formData.noTeleponWali.trim() || null,
+      berkasPendukung: berkas || null,
+      statusBerkas: "Menunggu Verifikasi",
+    };
+
+    // Simpan ke browser lebih dulu agar pengajuan langsung masuk antrean TU
+    // walaupun SQLite Vercel bersifat read-only.
+    const lokal = tambahMutasiLokal(payload);
+    setTautanWa(buatTautanWhatsAppAdmin(lokal));
+    setSisaDetik(3);
+    setSudahDialihkan(false);
+    setNotifSukses(true);
+    setMenyimpan(false);
+
+    void api.createMutasiSiswa(payload).catch((error) =>
+      console.error("Gagal mengirim salinan mutasi ke server:", error)
+    );
   };
 
   const isMutasiMasuk = jenisMutasi === "MASUK";

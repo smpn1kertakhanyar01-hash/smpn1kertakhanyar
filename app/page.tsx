@@ -8,7 +8,10 @@ import OpeningLaunching, {
 } from "@/components/OpeningLaunching";
 import PageHeader from "@/components/PageHeader";
 import { api } from "@/lib/api-client";
-import { KATEGORI_PENGAMBILAN_IJAZAH } from "@/lib/constants";
+import {
+  bacaPengaturanIjazahLokal,
+  berlanggananPerubahanIjazah,
+} from "@/lib/ijazah-store";
 import { migrasikanDataLama } from "@/lib/migrate";
 import {
   apakahLogin,
@@ -46,32 +49,29 @@ export default function HomePage() {
     void migrasikanDataLama();
 
     // 3. Rekam dan hitung statistik kunjungan website
-    if (sudahRekamKunjungan.current) return;
-    sudahRekamKunjungan.current = true;
+    if (!sudahRekamKunjungan.current) {
+      sudahRekamKunjungan.current = true;
+      api
+        .recordVisit()
+        .then((statistik) => {
+          setPengunjungHariIni(statistik.hariIni);
+          setTotalPengunjung(statistik.total);
+        })
+        .catch((error) => {
+          console.error("Gagal membaca statistik pengunjung:", error);
+        });
+    }
 
-    api
-      .recordVisit()
-      .then((statistik) => {
-        setPengunjungHariIni(statistik.hariIni);
-        setTotalPengunjung(statistik.total);
-      })
-      .catch((error) => {
-        console.error("Gagal membaca statistik pengunjung:", error);
-      });
+    // 4. Syarat ijazah dibaca dari localStorage agar perubahan TU langsung
+    //    aktif tanpa menunggu SQLite/serverless.
+    const muatSyarat = () => {
+      setSyaratIjazah(bacaPengaturanIjazahLokal());
+      setGagalSyaratIjazah("");
+      setMemuatSyaratIjazah(false);
+    };
+    muatSyarat();
 
-    api
-      .getPengaturanLayanan(KATEGORI_PENGAMBILAN_IJAZAH)
-      .then((hasil) => {
-        setSyaratIjazah(hasil);
-        setGagalSyaratIjazah("");
-      })
-      .catch((error) => {
-        console.error("Gagal membaca persyaratan ijazah:", error);
-        setGagalSyaratIjazah(
-          "Informasi persyaratan belum dapat dimuat. Silakan coba lagi nanti."
-        );
-      })
-      .finally(() => setMemuatSyaratIjazah(false));
+    return berlanggananPerubahanIjazah(muatSyarat);
   }, []);
 
   // Handler proteksi untuk menu khusus siswa
@@ -500,13 +500,21 @@ export default function HomePage() {
                     }`
                   : "Informasi resmi Tata Usaha"}
               </span>
-              <button
-                type="button"
-                onClick={() => setTampilSyaratIjazah(false)}
-                className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200"
-              >
-                Tutup
-              </button>
+              <div className="flex items-center gap-2">
+                <Link
+                  href="/pengambilan-ijazah"
+                  className="rounded-xl bg-amber-100 px-4 py-2 text-xs font-bold text-amber-800 transition hover:bg-amber-200"
+                >
+                  Buka Layanan Ijazah →
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => setTampilSyaratIjazah(false)}
+                  className="rounded-xl bg-slate-100 px-4 py-2 text-xs font-bold text-slate-600 transition hover:bg-slate-200"
+                >
+                  Tutup
+                </button>
+              </div>
             </div>
           </div>
         </div>

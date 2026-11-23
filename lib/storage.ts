@@ -29,6 +29,11 @@ export const STORAGE_KEYS = {
   suratIzin: "SMPN1KH_SURAT_IZIN",
   presensiData: "SMPN1KH_PRESENSI_DATA",
   jurnalData: "SMPN1KH_JURNAL_DATA",
+  // Rekap dan keputusan mutasi siswa (TU) disimpan di browser agar tidak
+  // bergantung pada SQLite Vercel yang bersifat read-only.
+  mutasiData: "SMPN1KH_MUTASI_DATA",
+  // Syarat ijazah + antrean/status verifikasi pengambilan ijazah.
+  syaratIjazah: "SMPN1KH_SYARAT_IJAZAH",
   // Daftar siswa hasil impor PPDB (lengkap dengan sandi awal).
   studentsData: "SMPN1KH_STUDENTS_DATA",
 } as const;
