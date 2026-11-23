@@ -255,16 +255,22 @@ export default function AdminTuIjazahPage() {
         title="ADMINISTRASI PENGAMBILAN IJAZAH"
         subtitle="Syarat & Ketentuan serta Antrean Verifikasi"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href="/admin-tu"
-            className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
+            className="inline-flex items-center gap-1.5 rounded-lg border border-blue-200 bg-blue-50 px-3 py-2 text-xs font-bold text-blue-700 transition hover:bg-blue-100"
           >
-            ← Dashboard TU
+            ← Kembali ke Dashboard TU
+          </Link>
+          <Link
+            href="/"
+            className="inline-flex items-center rounded-lg border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 transition hover:bg-slate-50 hover:text-blue-700"
+          >
+            Beranda
           </Link>
           <button
             onClick={handleLogout}
-            className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-semibold px-3 py-1.5 rounded-lg transition"
+            className="inline-flex items-center rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs font-bold text-rose-600 transition hover:bg-rose-100"
           >
             Keluar
           </button>
