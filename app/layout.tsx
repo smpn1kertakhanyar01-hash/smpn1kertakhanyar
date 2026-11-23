@@ -6,6 +6,11 @@ export const metadata: Metadata = {
   title: "E-Layanan Kesiswaan - SMPN 1 Kertak Hanyar",
   description:
     "Portal Layanan Digital Kesiswaan, Presensi, dan Informasi Resmi SMP Negeri 1 Kertak Hanyar",
+  icons: {
+    icon: "/logo-sekolah.png",
+    shortcut: "/logo-sekolah.png",
+    apple: "/logo-sekolah.png",
+  },
 };
 
 export default function RootLayout({
