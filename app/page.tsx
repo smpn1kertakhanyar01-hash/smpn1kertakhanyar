@@ -121,9 +121,9 @@ export default function HomePage() {
       <PageHeader
         title="SMP NEGERI 1 KERTAK HANYAR"
         subtitle="E-Layanan & Portal Informasi Kesiswaan"
-        className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50"
-        titleClassName="font-extrabold text-slate-900 text-sm leading-tight tracking-tight break-words"
-        subtitleClassName="text-[11px] text-blue-600 font-semibold tracking-wide break-words"
+        className="sticky top-0 z-50 flex items-center justify-between gap-2 border-b border-slate-200 bg-white/80 px-4 py-3 backdrop-blur-md sm:px-8"
+        titleClassName="text-xs font-bold leading-tight text-slate-900 break-words sm:text-base"
+        subtitleClassName="text-[11px] font-semibold tracking-wide text-blue-600 break-words"
       >
         {/* Navigasi desktop */}
         <div className="hidden items-center gap-2 md:flex">
@@ -167,57 +167,60 @@ export default function HomePage() {
           aria-label={menuTerbuka ? "Tutup menu navigasi" : "Buka menu navigasi"}
           aria-expanded={menuTerbuka}
           aria-controls="menu-navigasi-mobile"
-          className="flex h-10 min-h-[40px] w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-base text-slate-700 transition hover:bg-blue-50 md:hidden"
+          className="flex h-10 min-h-[40px] w-10 shrink-0 items-center justify-center rounded-xl border border-slate-200 bg-white text-base text-slate-700 transition hover:bg-blue-50 md:hidden"
         >
           {menuTerbuka ? "✕" : "☰"}
         </button>
-        {menuTerbuka && (
-          <div
-            id="menu-navigasi-mobile"
-            className="absolute inset-x-0 top-full z-40 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur md:hidden"
-          >
-            <div className="flex flex-col gap-2">
-              <Link
-                href="/login-guru"
-                onClick={() => setMenuTerbuka(false)}
-                className="flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
-              >
-                Portal Guru →
-              </Link>
-              {isSiswaLogin ? (
-                <>
-                  <Link
-                    href="/pengaturan-akun"
-                    onClick={() => setMenuTerbuka(false)}
-                    className="flex min-h-[40px] items-center truncate rounded-xl border border-blue-200 bg-blue-50 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-100"
-                  >
-                    👤 {namaSiswa} ⚙️
-                  </Link>
-                  <button
-                    onClick={() => {
-                      setMenuTerbuka(false);
-                      void handleLogoutSiswa();
-                    }}
-                    className="min-h-[40px] rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
-                  >
-                    Keluar
-                  </button>
-                </>
-              ) : (
+      </PageHeader>
+
+      {/* Dropdown mobile: berada di alur dokumen sehingga tidak menimpa
+          lencana motto di bagian hero saat dibuka. */}
+      {menuTerbuka && (
+        <div
+          id="menu-navigasi-mobile"
+          className="relative z-40 w-full border-t border-slate-100 bg-white px-4 pb-4 pt-3 shadow-lg md:hidden"
+        >
+          <div className="flex flex-col gap-2">
+            <Link
+              href="/login-guru"
+              onClick={() => setMenuTerbuka(false)}
+              className="flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+            >
+              Portal Guru →
+            </Link>
+            {isSiswaLogin ? (
+              <>
+                <Link
+                  href="/pengaturan-akun"
+                  onClick={() => setMenuTerbuka(false)}
+                  className="flex min-h-[40px] items-center truncate rounded-xl border border-blue-200 bg-blue-50 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-100"
+                >
+                  👤 {namaSiswa} ⚙️
+                </Link>
                 <button
                   onClick={() => {
                     setMenuTerbuka(false);
-                    handleKlikMasukSiswa();
+                    void handleLogoutSiswa();
                   }}
-                  className="min-h-[40px] rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700"
+                  className="min-h-[40px] rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
                 >
-                  Masuk Siswa
+                  Keluar
                 </button>
-              )}
-            </div>
+              </>
+            ) : (
+              <button
+                onClick={() => {
+                  setMenuTerbuka(false);
+                  handleKlikMasukSiswa();
+                }}
+                className="min-h-[40px] rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700"
+              >
+                Masuk Siswa
+              </button>
+            )}
           </div>
-        )}
-      </PageHeader>
+        </div>
+      )}
 
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 sm:px-8 pt-12 pb-8 text-center">
