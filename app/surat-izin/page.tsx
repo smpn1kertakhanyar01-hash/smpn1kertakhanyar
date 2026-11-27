@@ -198,13 +198,17 @@ export default function SuratIzinSiswaPage() {
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
     isDrawingRef.current = true;
+    // Skala koordinat CSS ke ukuran internal canvas agar tanda tangan tidak
+    // terpotong saat canvas diperkecil di layar ponsel.
+    const skalaX = canvas.width / rect.width;
+    const skalaY = canvas.height / rect.height;
     let x = 0, y = 0;
     if ("touches" in e) {
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
+      x = (e.touches[0].clientX - rect.left) * skalaX;
+      y = (e.touches[0].clientY - rect.top) * skalaY;
     } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
+      x = (e.clientX - rect.left) * skalaX;
+      y = (e.clientY - rect.top) * skalaY;
     }
     ctx.beginPath();
     ctx.moveTo(x, y);
@@ -217,14 +221,16 @@ export default function SuratIzinSiswaPage() {
     const rect = canvas.getBoundingClientRect();
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
+    const skalaX = canvas.width / rect.width;
+    const skalaY = canvas.height / rect.height;
     let x = 0, y = 0;
     if ("touches" in e) {
       e.preventDefault();
-      x = e.touches[0].clientX - rect.left;
-      y = e.touches[0].clientY - rect.top;
+      x = (e.touches[0].clientX - rect.left) * skalaX;
+      y = (e.touches[0].clientY - rect.top) * skalaY;
     } else {
-      x = e.clientX - rect.left;
-      y = e.clientY - rect.top;
+      x = (e.clientX - rect.left) * skalaX;
+      y = (e.clientY - rect.top) * skalaY;
     }
     ctx.lineWidth = 2;
     ctx.lineCap = "round";
@@ -283,10 +289,10 @@ export default function SuratIzinSiswaPage() {
   }
 
   return (
-    <main className="min-h-screen bg-[#fafbfc] text-slate-800 font-sans py-12 px-4 sm:px-6">
-      <div className="max-w-2xl mx-auto">
-        <div className="mb-6 flex justify-between items-center">
-          <div className="flex gap-4 items-center">
+    <main className="min-h-screen bg-[#fafbfc] px-4 pb-28 pt-8 font-sans text-slate-800 sm:px-6 sm:pb-16 sm:pt-12">
+      <div className="mx-auto w-full max-w-2xl">
+        <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
+          <div className="flex flex-wrap items-center gap-3">
             <Link href="/" className="text-xs font-semibold text-blue-600 hover:text-blue-800 transition">
               ← Beranda
             </Link>
@@ -302,7 +308,7 @@ export default function SuratIzinSiswaPage() {
           </button>
         </div>
 
-        <div className="bg-white border border-slate-200/90 rounded-3xl p-6 sm:p-10 shadow-sm">
+        <div className="w-full rounded-3xl border border-slate-200/90 bg-white p-5 shadow-sm sm:p-8">
           <div className="text-center pb-6 border-b border-slate-100">
             <div className="w-14 h-14 mx-auto mb-2 p-1 flex items-center justify-center rounded-2xl bg-blue-50 border border-blue-200">
               <Logo priority className="h-full w-full rounded-xl object-contain" />
@@ -356,7 +362,7 @@ export default function SuratIzinSiswaPage() {
                     type="text"
                     disabled
                     value={formData.nisn}
-                    className="w-full text-xs sm:text-sm border border-slate-200 bg-slate-50 text-slate-500 rounded-xl px-3.5 py-2.5 cursor-not-allowed"
+                    className="w-full text-sm border border-slate-200 bg-slate-50 text-slate-500 rounded-xl px-3.5 py-2.5 cursor-not-allowed"
                   />
                 </div>
                 <div>
@@ -366,7 +372,7 @@ export default function SuratIzinSiswaPage() {
                     required
                     value={formData.namaLengkap}
                     onChange={(e) => setFormData({ ...formData, namaLengkap: e.target.value })}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
                   />
                 </div>
               </div>
@@ -377,7 +383,7 @@ export default function SuratIzinSiswaPage() {
                   <select
                     value={formData.kelas}
                     onChange={(e) => setFormData({ ...formData, kelas: e.target.value })}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
                   >
                     {pilihanKelas.map((kelas) => (
                       <option key={kelas} value={kelas}>
@@ -391,7 +397,7 @@ export default function SuratIzinSiswaPage() {
                   <select
                     value={formData.jenisIzin}
                     onChange={(e) => setFormData({ ...formData, jenisIzin: e.target.value })}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
                   >
                     <option value="Sakit">Sakit</option>
                     <option value="Keperluan Keluarga">Keperluan Keluarga</option>
@@ -408,7 +414,7 @@ export default function SuratIzinSiswaPage() {
                     required
                     value={formData.tanggalMulai}
                     onChange={(e) => setFormData({ ...formData, tanggalMulai: e.target.value })}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
                   />
                 </div>
                 <div>
@@ -418,7 +424,7 @@ export default function SuratIzinSiswaPage() {
                     required
                     value={formData.tanggalSelesai}
                     onChange={(e) => setFormData({ ...formData, tanggalSelesai: e.target.value })}
-                    className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
+                    className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 bg-white"
                   />
                 </div>
               </div>
@@ -431,7 +437,7 @@ export default function SuratIzinSiswaPage() {
                   placeholder="Tuliskan keterangan lengkap..."
                   value={formData.alasan}
                   onChange={(e) => setFormData({ ...formData, alasan: e.target.value })}
-                  className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-600 transition"
+                  className="w-full text-sm border border-slate-200 rounded-xl p-3 outline-none focus:border-blue-600 transition"
                 />
               </div>
 
@@ -448,7 +454,7 @@ export default function SuratIzinSiswaPage() {
                   accept="image/*"
                   required
                   onChange={handleUploadFoto}
-                  className="w-full text-xs text-slate-600 file:mr-3 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer"
+                  className="w-full min-w-0 max-w-full cursor-pointer text-xs text-slate-600 file:mr-3 file:rounded-xl file:border-0 file:bg-blue-600 file:px-4 file:py-2.5 file:text-xs file:font-semibold file:text-white hover:file:bg-blue-700"
                 />
 
                 {formData.fotoBukti && (
@@ -478,7 +484,7 @@ export default function SuratIzinSiswaPage() {
                       placeholder="Nama orang tua/wali"
                       value={formData.namaWali}
                       onChange={(e) => setFormData({ ...formData, namaWali: e.target.value })}
-                      className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
+                      className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
                     />
                   </div>
                   <div>
@@ -489,7 +495,7 @@ export default function SuratIzinSiswaPage() {
                       placeholder="Contoh: 08123456789"
                       value={formData.noTeleponWali}
                       onChange={(e) => setFormData({ ...formData, noTeleponWali: e.target.value })}
-                      className="w-full text-xs sm:text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
+                      className="w-full text-sm border border-slate-200 rounded-xl px-3.5 py-2.5 outline-none focus:border-blue-600 transition"
                     />
                   </div>
                 </div>
@@ -513,7 +519,7 @@ export default function SuratIzinSiswaPage() {
                     onTouchMove={draw}
                     onTouchEnd={endDrawing}
                   />
-                  <div className="mt-2 flex justify-between items-center">
+                  <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
                     <p className="text-[10px] text-slate-500">Bubuhkan tanda tangan pada area di atas</p>
                     <button
                       type="button"

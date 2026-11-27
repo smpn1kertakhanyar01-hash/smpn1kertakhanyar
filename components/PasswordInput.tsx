@@ -44,8 +44,8 @@ function EyeOffIcon() {
 
 /**
  * Input kata sandi dengan tombol mata untuk menampilkan/menyembunyikan teks.
- * className dari halaman tetap dipakai; `pr-10` ditambahkan agar teks tidak
- * menabrak ikon di sisi kanan kotak input.
+ * className dari halaman tetap dipakai; `pr-12` ditambahkan agar teks tidak
+ * menabrak ikon di sisi kanan kotak input pada layar sempit.
  */
 export default function PasswordInput({
   className = "",
@@ -63,7 +63,7 @@ export default function PasswordInput({
         {...props}
         type={showPassword ? "text" : "password"}
         disabled={disabled}
-        className={`${className} pr-10`.trim()}
+        className={`${className} min-h-[40px] pr-12`.trim()}
       />
       <button
         type="button"
@@ -72,7 +72,7 @@ export default function PasswordInput({
         aria-label={label}
         aria-pressed={showPassword}
         title={label}
-        className="absolute inset-y-0 right-0 flex items-center pr-3 text-slate-400 transition hover:text-slate-700 focus:outline-none focus:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
+        className="absolute inset-y-0 right-0 flex min-h-[40px] w-11 items-center justify-center pr-2 text-slate-400 transition hover:text-slate-700 focus:outline-none focus:text-blue-600 disabled:cursor-not-allowed disabled:opacity-50"
       >
         {showPassword ? <EyeOffIcon /> : <EyeIcon />}
       </button>

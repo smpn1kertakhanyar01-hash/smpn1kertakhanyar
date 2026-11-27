@@ -596,8 +596,8 @@ export default function AdminTuMutasiPage() {
           </form>
         )}
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Mutasi Masuk
             </p>
@@ -605,7 +605,7 @@ export default function AdminTuMutasiPage() {
               {memuat ? "..." : jumlah.masuk}
             </h3>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Mutasi Keluar
             </p>
@@ -613,7 +613,7 @@ export default function AdminTuMutasiPage() {
               {memuat ? "..." : jumlah.keluar}
             </h3>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Menunggu Verifikasi
             </p>
@@ -621,7 +621,7 @@ export default function AdminTuMutasiPage() {
               {memuat ? "..." : jumlah.menunggu}
             </h3>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Disetujui
             </p>

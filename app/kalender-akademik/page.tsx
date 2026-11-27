@@ -80,8 +80,8 @@ export default function KalenderAkademikPage() {
           </div>
 
           {/* Tabel Agenda Minimalis */}
-          <div className="overflow-x-auto mt-4">
-            <table className="w-full text-left text-xs">
+          <div className="mt-4 w-full overflow-x-auto">
+            <table className="w-full min-w-[640px] text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-400 font-semibold uppercase text-[10px]">
                   <th className="py-2.5 px-3">Tanggal</th>

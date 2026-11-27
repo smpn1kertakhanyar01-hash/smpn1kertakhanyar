@@ -1146,7 +1146,7 @@ Terima kasih.`;
       key={menu.id}
       type="button"
       onClick={() => setTabAktif(menu.id)}
-      className={`flex items-center gap-2.5 rounded-xl border px-3 py-2.5 text-[11px] font-bold transition text-left ${
+      className={`flex min-h-[40px] shrink-0 items-center gap-2.5 whitespace-nowrap rounded-xl border px-3 py-2.5 text-[11px] font-bold transition text-left lg:w-full ${
         tabAktif === menu.id
           ? "bg-blue-50 text-blue-700 border-blue-200 shadow-sm"
           : "bg-white text-slate-600 border-transparent hover:bg-slate-50"
@@ -1170,16 +1170,16 @@ Terima kasih.`;
         subtitle="SMP Negeri 1 Kertak Hanyar"
         badgeClassName="w-10 h-10 rounded-xl bg-white border border-slate-200 p-1 flex items-center justify-center"
       >
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href="/"
-            className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
+            className="inline-flex min-h-[40px] items-center rounded-lg px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-blue-600"
           >
             ← Beranda
           </Link>
           <button
             onClick={handleLogout}
-            className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-semibold px-3 py-1.5 rounded-lg transition"
+            className="min-h-[40px] rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
           >
             Keluar
           </button>
@@ -1187,7 +1187,7 @@ Terima kasih.`;
       </PageHeader>
 
       {/* Konten Utama */}
-      <div className="max-w-7xl mx-auto px-6 sm:px-8 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-8 py-6 sm:py-8">
         {pesanAkses && (
           <div className="mb-6 p-4 rounded-2xl bg-rose-50 border border-rose-200 text-rose-700 text-xs font-semibold flex items-start justify-between gap-3 shadow-sm">
             <span>⛔ {pesanAkses}</span>
@@ -1203,29 +1203,29 @@ Terima kasih.`;
         )}
 
         {/* Ringkasan Metrik */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">Pengunjung Hari Ini</p>
             <h3 className="text-2xl font-black text-blue-600 mt-1">
               {angkaPengunjung} <span className="text-xs font-normal text-slate-400">Orang</span>
             </h3>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">Catatan Insiden / Kejadian</p>
             <h3 className="text-2xl font-black text-indigo-600 mt-1">
               {angkaInsiden} <span className="text-xs font-normal text-slate-400">Kasus</span>
             </h3>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">Izin Menunggu</p>
             <h3 className="text-2xl font-black text-amber-600 mt-1">
               {angkaIzinMenunggu} Berkas
             </h3>
           </div>
 
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">Izin Disetujui</p>
             <h3 className="text-2xl font-black text-emerald-600 mt-1">
               {angkaIzinDisetujui} Berkas
@@ -1236,28 +1236,38 @@ Terima kasih.`;
         <div className="grid grid-cols-1 lg:grid-cols-[250px_minmax(0,1fr)] gap-6 items-start">
           {/* Navigasi Samping */}
           <aside className="lg:sticky lg:top-24">
-            <nav className="bg-white border border-slate-200 rounded-2xl shadow-sm p-3">
-              <p className="px-1 text-[10px] font-black uppercase tracking-wider text-slate-400">
+            <nav className="rounded-2xl border border-slate-200 bg-white p-3 shadow-sm">
+              <p className="hidden px-1 text-[10px] font-black uppercase tracking-wider text-slate-400 lg:block">
                 Menu Kesiswaan
               </p>
-              <div className="mt-2 grid grid-cols-2 lg:grid-cols-1 gap-1.5">
+
+              {/* Mobile: satu bilah menu yang bisa digeser horizontal. */}
+              <div className="flex gap-2 overflow-x-auto whitespace-nowrap pb-2 lg:hidden">
                 {menuUmum.map(tombolMenu)}
+                {isAdminTu && menuTu.map(tombolMenu)}
               </div>
 
-              {isAdminTu ? (
-                <div className="mt-4 pt-3 border-t border-slate-200">
-                  <p className="px-1 text-[10px] font-black uppercase tracking-wider text-amber-600">
-                    Administrasi Tata Usaha
-                  </p>
-                  <div className="mt-2 grid grid-cols-2 lg:grid-cols-1 gap-1.5">
-                    {menuTu.map(tombolMenu)}
-                  </div>
+              {/* Desktop: sidebar penuh seperti sebelumnya. */}
+              <div className="hidden lg:block">
+                <div className="mt-2 grid grid-cols-1 gap-1.5">
+                  {menuUmum.map(tombolMenu)}
                 </div>
-              ) : (
-                <p className="mt-4 px-1 text-[10px] leading-relaxed text-slate-400">
-                  Menu Administrasi Tata Usaha hanya tampil untuk akun Admin TU.
-                </p>
-              )}
+
+                {isAdminTu ? (
+                  <div className="mt-4 border-t border-slate-200 pt-3">
+                    <p className="px-1 text-[10px] font-black uppercase tracking-wider text-amber-600">
+                      Administrasi Tata Usaha
+                    </p>
+                    <div className="mt-2 grid grid-cols-1 gap-1.5">
+                      {menuTu.map(tombolMenu)}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="mt-4 px-1 text-[10px] leading-relaxed text-slate-400">
+                    Menu Administrasi Tata Usaha hanya tampil untuk akun Admin TU.
+                  </p>
+                )}
+              </div>
             </nav>
           </aside>
 
@@ -1287,8 +1297,8 @@ Terima kasih.`;
                 </button>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="p-3">Siswa</th>
@@ -1441,8 +1451,8 @@ Terima kasih.`;
                 </Link>
               </div>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="p-3 w-12 text-center">No</th>
@@ -1626,8 +1636,8 @@ Terima kasih.`;
                   <p>Kondisi sekolah kondusif atau belum ada insiden yang dicatat guru pengawas.</p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
-                  <table className="w-full text-left text-xs">
+                <div className="w-full overflow-x-auto">
+                  <table className="w-full min-w-[640px] text-left text-xs">
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
                         <th className="p-3">Waktu & Guru Piket</th>
@@ -1726,7 +1736,7 @@ Terima kasih.`;
                 </p>
               </div>
             ) : (
-              <div className="overflow-x-auto w-full">
+              <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[1180px] text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
@@ -1923,7 +1933,7 @@ Terima kasih.`;
                   : "Tidak ada akun siswa yang cocok dengan pencarian."}
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[920px] text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
@@ -2260,7 +2270,7 @@ Terima kasih.`;
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
+                <div className="w-full overflow-x-auto">
                   <table className="w-full min-w-[860px] text-left text-xs">
                     <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                       <tr>
@@ -2375,8 +2385,8 @@ Terima kasih.`;
             {riwayatKunjungan.length === 0 ? (
               <p className="p-8 text-center text-xs text-slate-400">Belum ada data kunjungan yang terekam.</p>
             ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-xs">
+              <div className="w-full overflow-x-auto">
+                <table className="w-full min-w-[640px] text-left text-xs">
                   <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                     <tr>
                       <th className="p-3">No</th>
@@ -2410,7 +2420,7 @@ Terima kasih.`;
 
       {/* Toast Notifikasi Sukses */}
       {notifikasiSukses && (
-        <div className="fixed top-5 right-5 z-[10000] max-w-sm">
+        <div className="fixed left-4 right-4 top-4 z-[10000] max-w-sm sm:left-auto">
           <div className="flex items-start gap-2.5 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800 shadow-lg">
             <span className="text-base leading-none">✅</span>
             <span className="leading-relaxed">{notifikasiSukses}</span>

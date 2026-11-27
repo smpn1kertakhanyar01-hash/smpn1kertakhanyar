@@ -372,23 +372,23 @@ export default function AdminTuPage() {
         title="DASHBOARD TATA USAHA"
         subtitle="Pengelolaan Administrasi Kesiswaan & Mutasi Siswa"
       >
-        <div className="flex items-center gap-2">
+        <div className="flex flex-wrap items-center justify-end gap-2">
           <Link
             href="/"
-            className="text-xs text-slate-600 hover:text-blue-600 font-medium px-3 py-1.5 transition"
+            className="inline-flex min-h-[40px] items-center rounded-lg px-3 text-xs font-medium text-slate-600 transition hover:bg-slate-100 hover:text-blue-600"
           >
             ← Beranda
           </Link>
           <button
             onClick={handleLogout}
-            className="text-xs bg-rose-50 hover:bg-rose-100 text-rose-600 border border-rose-200 font-semibold px-3 py-1.5 rounded-lg transition"
+            className="min-h-[40px] rounded-lg border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
           >
             Keluar
           </button>
         </div>
       </PageHeader>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-8">
+      <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 mb-6 flex items-start gap-3">
           <span className="shrink-0 w-9 h-9 rounded-xl bg-white/70 border border-amber-200 flex items-center justify-center text-lg">
             🗂️
@@ -408,8 +408,8 @@ export default function AdminTuPage() {
           </div>
         </div>
 
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mb-8 grid grid-cols-2 gap-3 md:grid-cols-4">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">
               Total Pengajuan
             </p>
@@ -418,7 +418,7 @@ export default function AdminTuPage() {
               <span className="text-xs font-normal text-slate-400">Berkas</span>
             </h3>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">
               Mutasi Masuk
             </p>
@@ -427,7 +427,7 @@ export default function AdminTuPage() {
               <span className="text-xs font-normal text-slate-400">Siswa</span>
             </h3>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">
               Mutasi Keluar
             </p>
@@ -436,7 +436,7 @@ export default function AdminTuPage() {
               <span className="text-xs font-normal text-slate-400">Siswa</span>
             </h3>
           </div>
-          <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-4 shadow-sm sm:p-5">
             <p className="text-xs font-semibold text-slate-500 uppercase">
               Belum Diputuskan
             </p>
@@ -450,7 +450,7 @@ export default function AdminTuPage() {
         {/* Navigasi tab: satu menu aktif agar halaman tidak menumpuk ke bawah. */}
         <nav
           aria-label="Navigasi Dashboard Tata Usaha"
-          className="mb-6 grid grid-cols-2 gap-2 rounded-2xl border border-slate-200 bg-white p-2 shadow-sm lg:grid-cols-4"
+          className="mb-6 flex gap-2 overflow-x-auto whitespace-nowrap rounded-2xl border border-slate-200 bg-white p-2 pb-3 shadow-sm lg:grid lg:grid-cols-4 lg:overflow-visible lg:pb-2"
         >
           {DAFTAR_TAB_TU.map((tab) => (
             <button
@@ -458,7 +458,7 @@ export default function AdminTuPage() {
               type="button"
               onClick={() => setTabAktif(tab.id)}
               aria-current={tabAktif === tab.id ? "page" : undefined}
-              className={`flex items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[11px] font-bold transition sm:text-xs ${
+              className={`flex min-h-[40px] shrink-0 items-center justify-center gap-2 rounded-xl px-3 py-2.5 text-[11px] font-bold transition sm:text-xs lg:min-w-0 ${
                 tabAktif === tab.id
                   ? "bg-blue-600 text-white shadow-sm"
                   : "text-slate-600 hover:bg-slate-50 hover:text-blue-700"
@@ -510,7 +510,7 @@ export default function AdminTuPage() {
                 Tidak ada siswa yang cocok dengan pencarian.
               </p>
             ) : (
-              <div className="max-h-[420px] overflow-auto">
+              <div className="max-h-[420px] w-full overflow-auto">
                 <table className="w-full min-w-[720px] text-left text-xs">
                   <thead className="sticky top-0 border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
                     <tr>
@@ -593,7 +593,7 @@ export default function AdminTuPage() {
                 Belum ada pengajuan surat izin dari siswa.
               </p>
             ) : (
-              <div className="overflow-x-auto">
+              <div className="w-full overflow-x-auto">
                 <table className="w-full min-w-[900px] text-left text-xs">
                   <thead className="border-b border-slate-200 bg-slate-50 font-semibold text-slate-500">
                     <tr>

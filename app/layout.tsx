@@ -1,6 +1,11 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import TombolWA from "@/components/TombolWA";
 import "./globals.css";
+
+export const viewport: Viewport = {
+  width: "device-width",
+  initialScale: 1,
+};
 
 export const metadata: Metadata = {
   title: "E-Layanan Kesiswaan - SMPN 1 Kertak Hanyar",
@@ -20,7 +25,7 @@ export default function RootLayout({
 }) {
   return (
     <html lang="id">
-      <body className="antialiased selection:bg-blue-600 selection:text-white">
+      <body className="max-w-[100vw] antialiased selection:bg-blue-600 selection:text-white">
         {children}
         <TombolWA />
       </body>

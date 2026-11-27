@@ -234,8 +234,8 @@ export default function RekapPresensiPublikPage() {
               <p>Belum ada presensi yang diinput guru untuk tanggal atau kelas yang dipilih.</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-left text-xs">
+            <div className="w-full overflow-x-auto">
+              <table className="w-full min-w-[640px] text-left text-xs">
                 <thead className="bg-slate-50 text-slate-500 font-semibold border-b border-slate-200">
                   <tr>
                     <th className="p-3.5 w-12 text-center">No</th>

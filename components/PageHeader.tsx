@@ -2,7 +2,7 @@ import type { ReactNode } from "react";
 import Logo from "@/components/Logo";
 
 const HEADER_KELAS =
-  "bg-white border-b border-slate-200 px-6 sm:px-12 py-3.5 flex justify-between items-center sticky top-0 z-50";
+  "bg-white border-b border-slate-200 px-4 sm:px-8 py-3.5 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50";
 const BADGE_KELAS =
   "w-10 h-10 rounded-xl bg-blue-50 border border-blue-200 flex items-center justify-center font-black text-blue-700 text-xs shadow-sm";
 const JUDUL_KELAS = "font-extrabold text-slate-900 text-sm leading-tight";
@@ -37,7 +37,7 @@ export default function PageHeader({
 }: PageHeaderProps) {
   return (
     <header className={className}>
-      <div className="flex items-center gap-3">
+      <div className="flex min-w-0 items-center gap-3">
         <div className={badgeClassName}>
           {badgeText ?? (
             <Logo
@@ -46,7 +46,7 @@ export default function PageHeader({
             />
           )}
         </div>
-        <div>
+        <div className="min-w-0">
           <h1 className={titleClassName}>{title}</h1>
           <p className={subtitleClassName}>{subtitle}</p>
           {motto && <p className={mottoClassName}>{motto}</p>}

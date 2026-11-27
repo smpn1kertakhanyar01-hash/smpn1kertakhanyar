@@ -144,8 +144,8 @@ export default function LoginSiswaPage() {
   const tautanBantuan = `https://wa.me/${NOMOR_WHATSAPP}?text=${pesanBantuan}`;
 
   return (
-    <main className="min-h-screen bg-[#f8fbff] flex items-center justify-center p-4 font-sans text-slate-800">
-      <div className="w-full max-w-md bg-white border border-slate-200 rounded-3xl p-6 sm:p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-[#f8fbff] px-4 pb-24 pt-8 font-sans text-slate-800 sm:p-4">
+      <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-8">
         <div className="text-center mb-6">
           <div className="w-12 h-12 rounded-2xl bg-blue-50 border border-blue-100 flex items-center justify-center mx-auto mb-3 shadow-sm">
             <Logo priority className="h-full w-full rounded-2xl object-contain" />
@@ -164,7 +164,7 @@ export default function LoginSiswaPage() {
           </div>
         )}
 
-        <form onSubmit={handleLogin} className="space-y-4 text-xs">
+        <form onSubmit={handleLogin} className="space-y-4 text-sm">
           <div>
             <label className="block font-bold text-slate-700 mb-1">
               NISN Siswa / ID Akses

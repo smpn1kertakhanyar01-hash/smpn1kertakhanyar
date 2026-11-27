@@ -19,10 +19,47 @@
   }
 }
 
+@layer base {
+  /* Batasi lebar dokumen agar layar ponsel tidak bisa digeser ke samping. */
+  html,
+  body {
+    max-width: 100vw;
+    overflow-x: hidden;
+  }
+
+  /* `clip` tidak membuat kontainer scroll, sehingga header sticky tetap
+     bekerja walaupun overflow horizontal dimatikan di atas. */
+  body {
+    overflow-x: clip;
+    font-size: 16px;
+    -webkit-text-size-adjust: 100%;
+  }
+
+  /* Area sentuh minimal 40px untuk semua kontrol interaktif. */
+  button,
+  [role="button"],
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    min-height: 40px;
+  }
+
+  button,
+  [role="button"] {
+    cursor: pointer;
+  }
+}
+
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+}
+
+/* Bilah menu/tabel yang digeser dengan jari terasa halus di Android. */
+.overflow-x-auto {
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
 }
 
 /* Animasi angka hitung mundur layar peresmian. */

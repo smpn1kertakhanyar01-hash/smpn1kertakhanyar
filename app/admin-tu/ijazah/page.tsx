@@ -305,8 +305,8 @@ export default function AdminTuIjazahPage() {
           </div>
         )}
 
-        <div className="grid grid-cols-2 gap-4 mb-6">
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+        <div className="mb-6 grid grid-cols-2 gap-3">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Belum Diambil / Verifikasi
             </p>
@@ -314,7 +314,7 @@ export default function AdminTuIjazahPage() {
               {jumlah.menunggu}
             </h3>
           </div>
-          <div className="bg-white p-4 rounded-2xl border border-slate-200 shadow-sm">
+          <div className="min-w-0 rounded-2xl border border-slate-200 bg-white p-3 shadow-sm sm:p-4">
             <p className="text-[10px] font-semibold text-slate-500 uppercase">
               Ijazah Diserahkan
             </p>

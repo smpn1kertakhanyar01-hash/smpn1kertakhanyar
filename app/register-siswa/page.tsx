@@ -52,8 +52,8 @@ export default function RegisterSiswa() {
   };
 
   return (
-    <main className="min-h-screen bg-[#fafcff] flex items-center justify-center p-4 font-sans">
-      <div className="w-full max-w-md bg-white border border-slate-200/80 rounded-3xl p-8 shadow-sm">
+    <main className="flex min-h-screen items-center justify-center bg-[#fafcff] px-4 pb-24 pt-8 font-sans sm:p-4">
+      <div className="mx-auto w-full max-w-md rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm sm:p-8">
         <div className="text-center mb-6">
           <div className="w-14 h-14 mx-auto mb-2 flex items-center justify-center">
             <Logo priority className="h-full w-full object-contain" />

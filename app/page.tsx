@@ -34,6 +34,7 @@ export default function HomePage() {
   const [memuatSyaratIjazah, setMemuatSyaratIjazah] = useState(true);
   const [gagalSyaratIjazah, setGagalSyaratIjazah] = useState("");
   const [tampilSyaratIjazah, setTampilSyaratIjazah] = useState(false);
+  const [menuTerbuka, setMenuTerbuka] = useState(false);
 
   useEffect(() => {
     // 1. Periksa status sesi siswa
@@ -120,14 +121,15 @@ export default function HomePage() {
       <PageHeader
         title="SMP NEGERI 1 KERTAK HANYAR"
         subtitle="E-Layanan & Portal Informasi Kesiswaan"
-        className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-6 sm:px-12 py-3.5 flex justify-between items-center sticky top-0 z-50"
-        titleClassName="font-extrabold text-slate-900 text-sm leading-tight tracking-tight"
-        subtitleClassName="text-[11px] text-blue-600 font-semibold tracking-wide"
+        className="bg-white/80 backdrop-blur-md border-b border-slate-200 px-4 sm:px-8 py-3 flex flex-wrap items-center justify-between gap-3 sticky top-0 z-50"
+        titleClassName="font-extrabold text-slate-900 text-sm leading-tight tracking-tight break-words"
+        subtitleClassName="text-[11px] text-blue-600 font-semibold tracking-wide break-words"
       >
-        <div className="flex items-center gap-3">
+        {/* Navigasi desktop */}
+        <div className="hidden items-center gap-2 md:flex">
           <Link
             href="/login-guru"
-            className="text-xs font-bold text-slate-600 hover:text-blue-700 bg-slate-100 hover:bg-blue-50 border border-slate-200 px-3.5 py-2 rounded-xl transition"
+            className="inline-flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-slate-100 px-3.5 text-xs font-bold text-slate-600 transition hover:bg-blue-50 hover:text-blue-700"
           >
             Portal Guru →
           </Link>
@@ -137,13 +139,13 @@ export default function HomePage() {
               <Link
                 href="/pengaturan-akun"
                 title="Pengaturan Akun / Ubah Kata Sandi"
-                className="text-xs font-bold text-slate-700 bg-blue-50 border border-blue-200 px-3 py-1.5 rounded-xl hover:bg-blue-100 transition"
+                className="inline-flex min-h-[40px] max-w-[180px] items-center truncate rounded-xl border border-blue-200 bg-blue-50 px-3 text-xs font-bold text-slate-700 transition hover:bg-blue-100"
               >
-                👤 {namaSiswa} ⚙️
+                👤 <span className="truncate">{namaSiswa}</span> ⚙️
               </Link>
               <button
                 onClick={handleLogoutSiswa}
-                className="text-xs font-semibold text-rose-600 bg-rose-50 hover:bg-rose-100 border border-rose-200 px-2.5 py-1.5 rounded-xl transition"
+                className="min-h-[40px] rounded-xl border border-rose-200 bg-rose-50 px-3 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
               >
                 Keluar
               </button>
@@ -151,18 +153,76 @@ export default function HomePage() {
           ) : (
             <button
               onClick={handleKlikMasukSiswa}
-              className="text-xs font-bold text-white bg-blue-600 hover:bg-blue-700 px-4 py-2 rounded-xl shadow-sm transition hover:scale-[1.02] active:scale-[0.98]"
+              className="min-h-[40px] rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:scale-[1.02] hover:bg-blue-700 active:scale-[0.98]"
             >
               Masuk Siswa
             </button>
           )}
         </div>
+
+        {/* Hamburger + drawer mobile */}
+        <button
+          type="button"
+          onClick={() => setMenuTerbuka((buka) => !buka)}
+          aria-label={menuTerbuka ? "Tutup menu navigasi" : "Buka menu navigasi"}
+          aria-expanded={menuTerbuka}
+          aria-controls="menu-navigasi-mobile"
+          className="flex h-10 min-h-[40px] w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-base text-slate-700 transition hover:bg-blue-50 md:hidden"
+        >
+          {menuTerbuka ? "✕" : "☰"}
+        </button>
+        {menuTerbuka && (
+          <div
+            id="menu-navigasi-mobile"
+            className="absolute inset-x-0 top-full z-40 border-b border-slate-200 bg-white/95 px-4 py-3 shadow-lg backdrop-blur md:hidden"
+          >
+            <div className="flex flex-col gap-2">
+              <Link
+                href="/login-guru"
+                onClick={() => setMenuTerbuka(false)}
+                className="flex min-h-[40px] items-center rounded-xl border border-slate-200 bg-slate-100 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-50 hover:text-blue-700"
+              >
+                Portal Guru →
+              </Link>
+              {isSiswaLogin ? (
+                <>
+                  <Link
+                    href="/pengaturan-akun"
+                    onClick={() => setMenuTerbuka(false)}
+                    className="flex min-h-[40px] items-center truncate rounded-xl border border-blue-200 bg-blue-50 px-4 text-xs font-bold text-slate-700 transition hover:bg-blue-100"
+                  >
+                    👤 {namaSiswa} ⚙️
+                  </Link>
+                  <button
+                    onClick={() => {
+                      setMenuTerbuka(false);
+                      void handleLogoutSiswa();
+                    }}
+                    className="min-h-[40px] rounded-xl border border-rose-200 bg-rose-50 px-4 text-xs font-semibold text-rose-600 transition hover:bg-rose-100"
+                  >
+                    Keluar
+                  </button>
+                </>
+              ) : (
+                <button
+                  onClick={() => {
+                    setMenuTerbuka(false);
+                    handleKlikMasukSiswa();
+                  }}
+                  className="min-h-[40px] rounded-xl bg-blue-600 px-4 text-xs font-bold text-white shadow-sm transition hover:bg-blue-700"
+                >
+                  Masuk Siswa
+                </button>
+              )}
+            </div>
+          </div>
+        )}
       </PageHeader>
 
       {/* Hero Section */}
       <section className="max-w-6xl mx-auto px-4 sm:px-8 pt-12 pb-8 text-center">
         <div className="flex flex-col items-center gap-3 mb-4">
-          <span className="text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3.5 py-1.5 rounded-full inline-block">
+          <span className="max-w-full break-words text-center text-[11px] font-bold text-blue-700 bg-blue-50 border border-blue-100 px-3.5 py-1.5 rounded-full inline-block">
             SISTEM INFORMASI KESISWAAN DIGITAL
           </span>
           <span className="font-bold tracking-widest text-blue-700 bg-blue-50 border border-blue-200 px-4 py-1.5 rounded-full inline-flex items-center justify-center gap-2 text-xs sm:text-sm shadow-sm max-w-full">
@@ -228,7 +288,7 @@ export default function HomePage() {
               <div className="w-10 h-10 rounded-xl bg-blue-50 border border-blue-100 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition">
                 ✉️
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-blue-600 transition">
                   Pengajuan Surat Izin
                 </h4>
@@ -296,7 +356,7 @@ export default function HomePage() {
               <div className="w-10 h-10 rounded-xl bg-purple-50 border border-purple-100 flex items-center justify-center text-xl mb-3 group-hover:scale-110 transition">
                 📓
               </div>
-              <div className="flex items-center gap-2">
+              <div className="flex flex-wrap items-center gap-2">
                 <h4 className="font-extrabold text-slate-900 text-sm group-hover:text-purple-600 transition">
                   Jurnal Kejadian Harian
                 </h4>
@@ -381,8 +441,8 @@ export default function HomePage() {
             </div>
           </div>
 
-          <div className="flex gap-4 w-full sm:w-auto justify-center">
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-center min-w-[130px]">
+          <div className="flex w-full flex-1 gap-2 justify-center sm:w-auto sm:gap-4">
+            <div className="min-w-0 flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-center sm:min-w-[130px] sm:flex-none sm:px-5">
               <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
                 Hari Ini
               </span>
@@ -391,7 +451,7 @@ export default function HomePage() {
               </span>
             </div>
 
-            <div className="bg-slate-50 border border-slate-200 rounded-2xl px-5 py-3 text-center min-w-[130px]">
+            <div className="min-w-0 flex-1 bg-slate-50 border border-slate-200 rounded-2xl px-3 py-3 text-center sm:min-w-[130px] sm:flex-none sm:px-5">
               <span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">
                 Total Kunjungan
               </span>
@@ -404,7 +464,7 @@ export default function HomePage() {
       </section>
 
       {/* Footer */}
-      <footer className="max-w-6xl mx-auto px-4 sm:px-8 pt-10 pb-8 border-t border-slate-200 mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
+      <footer className="max-w-6xl mx-auto px-4 sm:px-8 pt-10 pb-24 sm:pb-8 border-t border-slate-200 mt-8 flex flex-col sm:flex-row justify-between items-center gap-4 text-xs text-slate-500">
         <div className="flex flex-col items-center gap-1 text-center sm:items-start sm:text-left">
           <p className="text-slate-500">
             © 2026 SMP Negeri 1 Kertak Hanyar. All rights reserved.
